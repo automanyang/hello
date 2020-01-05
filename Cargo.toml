@@ -1,7 +1,13 @@
 [package]
 name = "servant-macro"
 version = "0.1.0"
-authors = ["xt <motoyang@163.com>"]
+authors = ["automan.yang <automanyang@gmail.com>"]
+description = "servant-macro是servant库的辅助库，本库定义了四种类型的接口属性，会自动生成客户端和服务端的代码，方便应用开发。"
+repository = "https://github.com/automanyang/servant-macro"
+readme = "README.md"
+keywords = ["rpc"]
+license = "MIT"
+license-file = "LICENSE-MIT"
 edition = "2018"
 
 [lib]
