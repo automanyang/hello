@@ -6,6 +6,7 @@ description = "servant-macro是servant库的辅助库，本库定义了四种类
 repository = "https://github.com/automanyang/servant-macro"
 readme = "README.md"
 keywords = ["rpc"]
+categories = ["network-programming"]
 license = "MIT"
 license-file = "LICENSE-MIT"
 edition = "2018"
