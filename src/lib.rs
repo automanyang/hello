@@ -142,6 +142,21 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                     quote! {#x,}
                 })
                 .collect();
+            let input_receiver: Vec<_> = inputs
+                .iter()
+                .map(|i| {
+                    if let FnArg::Receiver(receiver) = i {
+                        Some(receiver)
+                    } else {
+                        None
+                    }
+                })
+                .filter(|i| i.is_some())
+                .map(|x| {
+                    let x = x.unwrap();
+                    quote! {#x,}
+                })
+                .collect();
             let inputs: Vec<_> = inputs
                 .iter()
                 .map(|i| {
@@ -160,7 +175,7 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             let method = quote! {
                 #(#attrs)*
                 #constness #asyncness #unsafety #abi #fn_token #ident #generics (
-                    &mut self,
+                    #(#input_receiver)* ctx: Option<servant::Context>,
                     #(#inputs)* #variadic
                 ) #output
                 #default #semi_token
@@ -172,7 +187,7 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let idents_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
     let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
     let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
-    let _methods_vec: Vec<_> = idents_collected.iter().map(|i| i.4.clone()).collect();
+    let methods_vec: Vec<_> = idents_collected.iter().map(|i| i.4.clone()).collect();
     let output_vec: Vec<_> = idents_collected.iter().map(|i| i.5.clone()).collect();
 
     let request_ident = Ident::new(&format!("{}Request", ident), ident.span());
@@ -194,7 +209,7 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let output2 = if cfg!(feature = "adapter") { quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
-            #(#methods)*
+            #(#methods_vec)*
         }
         pub struct #servant_ident<S> {
             name: String,
@@ -215,12 +230,12 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             fn category(&self) -> &'static str {
                 stringify!(#ident)
             }
-            fn serve(&mut self, req: Vec<u8>) -> Vec<u8> {
+            fn serve(&mut self, ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
                 let reps = match req {
                     #(
                         #request_ident_vect::#idents_camel_vec{ #(#args_vec)* } =>
-                            bincode::serialize(&self.entity.#ident_vec(#(#args_vec)*)),
+                            bincode::serialize(&self.entity.#ident_vec(ctx, #(#args_vec)*)),
                     )*
                 }
                 .unwrap();
@@ -233,12 +248,12 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let output3 = if cfg!(feature = "terminal") { quote!{
         #[derive(Clone)]
-        pub struct #proxy_ident(servant::Oid, servant::Terminal);
+        pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
 
         impl #proxy_ident {
-            pub fn new(name: &str, t: &servant::Terminal) -> Self {
+            pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
                 let oid = servant::Oid::new(name, stringify!(#ident));
-                Self(oid, t.clone())
+                Self(ctx, oid, t.clone())
             }
 
             #(
@@ -248,13 +263,12 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             ) -> servant::ServantResult<#output_vec> {
                 let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
                 let response = self
-                    .1
-                    .invoke(Some(self.0.clone()), bincode::serialize(&request).unwrap())
+                    .2
+                    .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
                     .await;
                 response.map(|x| bincode::deserialize(&x).unwrap())
             }
             )*
-
         }}
     } else {
         proc_macro2::TokenStream::new()
@@ -658,7 +672,7 @@ pub fn query_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             fn category(&self) -> &'static str {
                 stringify!(#ident)
             }
-            fn serve(&mut self, req: Vec<u8>) -> Vec<u8> {
+            fn serve(&mut self, _ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
                 let reps = match req {
                     #(
@@ -690,7 +704,7 @@ pub fn query_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
                 let response = self
                     .0
-                    .invoke(None, bincode::serialize(&request).unwrap())
+                    .invoke(None, None, bincode::serialize(&request).unwrap())
                     .await;
                 response.map(|x| bincode::deserialize(&x).unwrap())
             }
