@@ -219,6 +219,9 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn new(name: &str, entity: S) -> Self {
                 Self { name: name.to_string(), entity }
             }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
+            }
         }
         impl<S> servant::Servant for #servant_ident<S>
         where
@@ -226,9 +229,6 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         {
             fn name(&self) -> &str {
                 &self.name
-            }
-            fn category(&self) -> &'static str {
-                stringify!(#ident)
             }
             fn serve(&mut self, ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
@@ -254,6 +254,9 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
                 let oid = servant::Oid::new(name, stringify!(#ident));
                 Self(ctx, oid, t.clone())
+            }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
             }
 
             #(
@@ -438,6 +441,9 @@ pub fn report_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn new(name: &str, entity: S) -> Self {
                 Self { name: name.to_string(), entity }
             }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
+            }
         }
         impl<S> servant::ReportServant for #servant_ident<S>
         where
@@ -445,9 +451,6 @@ pub fn report_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         {
             fn name(&self) -> &str {
                 &self.name
-            }
-            fn category(&self) -> &'static str {
-                stringify!(#ident)
             }
             fn serve(&mut self, req: Vec<u8>) {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
@@ -470,6 +473,9 @@ pub fn report_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn new(name: &str, t: &servant::Terminal) -> Self {
                 let oid = servant::Oid::new(name, stringify!(#ident));
                 Self(oid, t.clone())
+            }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
             }
 
             #(
@@ -661,6 +667,9 @@ pub fn query_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn new(entity: S) -> Self {
                 Self { entity }
             }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
+            }
         }
         impl<S> servant::Servant for #servant_ident<S>
         where
@@ -668,9 +677,6 @@ pub fn query_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         {
             fn name(&self) -> &str {
                 ""
-            }
-            fn category(&self) -> &'static str {
-                stringify!(#ident)
             }
             fn serve(&mut self, _ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
@@ -694,6 +700,9 @@ pub fn query_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         impl #proxy_ident {
             pub fn new(t: &servant::Terminal) -> Self {
                 Self(t.clone())
+            }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
             }
 
             #(
