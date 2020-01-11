@@ -42,6 +42,233 @@ use proc_macro::TokenStream;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, Signature, TraitItem, TraitItemMethod};
 
 // --
+#[proc_macro_attribute]
+pub fn invoke_interface_with_persistency(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    // let derive_serde = parse_macro_input!(attr as DeriveSerde);
+    let ItemTrait {
+        attrs,
+        vis,
+        unsafety,
+        auto_token,
+        trait_token,
+        ident,
+        generics,
+        colon_token,
+        supertraits,
+        // brace_token,
+        items,
+        ..
+    } = parse_macro_input!(input as ItemTrait);
+
+    let methods: Vec<TraitItemMethod> = items
+        .iter()
+        .map(|i| {
+            if let TraitItem::Method(m) = i {
+                Some(m)
+            } else {
+                None
+            }
+        })
+        .filter(|i| i.is_some())
+        .map(|x| x.unwrap().clone())
+        .collect();
+    let idents_collected: Vec<_> = methods
+        .iter()
+        .map(|x| {
+            let TraitItemMethod {
+                attrs,
+                sig,
+                default,
+                semi_token,
+            } = x;
+            let Signature {
+                constness,
+                asyncness,
+                unsafety,
+                abi,
+                fn_token,
+                ident,
+                generics,
+                // paren_token,
+                inputs,
+                variadic,
+                output,
+                ..
+            } = sig;
+
+            let output_type = match output.clone() {
+                ReturnType::Default => quote! {()},
+                ReturnType::Type(_, t) => quote! {#t},
+            };
+            let ident_camel = Ident::new(&snake_to_camel(&ident.to_string()), ident.span());
+            let args: Vec<_> = inputs
+                .iter()
+                .map(|i| {
+                    if let FnArg::Typed(pat) = i {
+                        Some(pat)
+                    } else {
+                        None
+                    }
+                })
+                .filter(|i| i.is_some())
+                .map(|x| {
+                    let x = &x.unwrap().pat;
+                    quote! {#x,}
+                })
+                .collect();
+            let input_receiver: Vec<_> = inputs
+                .iter()
+                .map(|i| {
+                    if let FnArg::Receiver(receiver) = i {
+                        Some(receiver)
+                    } else {
+                        None
+                    }
+                })
+                .filter(|i| i.is_some())
+                .map(|x| {
+                    let x = x.unwrap();
+                    quote! {#x,}
+                })
+                .collect();
+            let inputs: Vec<_> = inputs
+                .iter()
+                .map(|i| {
+                    if let FnArg::Typed(pat) = i {
+                        Some(pat)
+                    } else {
+                        None
+                    }
+                })
+                .filter(|i| i.is_some())
+                .map(|x| {
+                    let x = x.unwrap();
+                    quote! {#x,}
+                })
+                .collect();
+            let method = quote! {
+                #(#attrs)*
+                #constness #asyncness #unsafety #abi #fn_token #ident #generics (
+                    #(#input_receiver)* ctx: Option<servant::Context>,
+                    #(#inputs)* #variadic
+                ) #output
+                #default #semi_token
+            };
+            (ident, ident_camel, args, inputs, method, output_type)
+        })
+        .collect();
+    let ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
+    let idents_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
+    let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
+    let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
+    let methods_vec: Vec<_> = idents_collected.iter().map(|i| i.4.clone()).collect();
+    let output_vec: Vec<_> = idents_collected.iter().map(|i| i.5.clone()).collect();
+
+    let request_ident = Ident::new(&format!("{}Request", ident), ident.span());
+    let request_ident_vect: Vec<_> = idents_collected
+        .iter()
+        .map(|_| request_ident.clone())
+        .collect();
+    let servant_ident = Ident::new(&format!("{}Servant", ident), ident.span());
+    let proxy_ident = Ident::new(&format!("{}Proxy", ident), ident.span());
+
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+        #[derive(serde::Serialize, serde::Deserialize)]
+        enum #request_ident {
+            #(#idents_camel_vec { #(#inputs_vec)* },)*
+        }}
+    } else {
+        proc_macro2::TokenStream::new()
+    };
+    let output2 = if cfg!(feature = "adapter") { quote! {
+        #( #attrs )*
+        #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
+            #(#methods_vec)*
+        }
+        pub struct #servant_ident<S>
+        {
+            name: String,
+            entity: S,
+        }
+        impl<S> #servant_ident<S> {
+            pub fn new(name: &str, entity: S) -> Self {
+                Self { name: name.to_string(), entity }
+            }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
+            }
+        }
+        // impl<S> From<&[u8]> for #servant_ident<S>
+        // where for<'de> S: serde::Deserialize<'de>,
+        // {
+        //     fn from(bytes: &[u8]) -> Self {
+        //         bincode::deserialize(bytes).unwrap()
+        //     }
+        // }
+        impl<S> servant::Servant for #servant_ident<S>
+        where
+            S: serde::Serialize + #ident + 'static,
+        {
+            fn name(&self) -> &str {
+                &self.name
+            }
+            fn dump(&self) -> servant::ServantResult<Vec<u8>> {
+                bincode::serialize(&self.entity).map_err(|e| e.to_string().into())
+            }
+            fn serve(&mut self, ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
+                let req: #request_ident = bincode::deserialize(&req).unwrap();
+                let reps = match req {
+                    #(
+                        #request_ident_vect::#idents_camel_vec{ #(#args_vec)* } =>
+                            bincode::serialize(&self.entity.#ident_vec(ctx, #(#args_vec)*)),
+                    )*
+                }
+                .unwrap();
+                reps
+            }
+        }}
+    } else {
+        proc_macro2::TokenStream::new()
+    };
+
+    let output3 = if cfg!(feature = "terminal") { quote!{
+        #[derive(Clone)]
+        pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
+
+        impl #proxy_ident {
+            pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
+                let oid = servant::Oid::new(name, stringify!(#ident));
+                Self(ctx, oid, t.clone())
+            }
+            pub fn category() -> &'static str {
+                stringify!(#ident)
+            }
+
+            #(
+            pub async fn #ident_vec(
+                &mut self,
+                #(#inputs_vec)*
+            ) -> servant::ServantResult<#output_vec> {
+                let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
+                let response = self
+                    .2
+                    .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+                    .await;
+                response.map(|x| bincode::deserialize(&x).unwrap())
+            }
+            )*
+        }}
+    } else {
+        proc_macro2::TokenStream::new()
+    };
+
+    let output = quote! {
+        #output1
+        #output2
+        #output3
+    };
+    output.into()
+}
 
 /// 定义带返回值方法的接口，接口中可以有多个带返回值的方法。
 ///
@@ -211,7 +438,8 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
             #(#methods_vec)*
         }
-        pub struct #servant_ident<S> {
+        pub struct #servant_ident<S>
+        {
             name: String,
             entity: S,
         }
