@@ -40,6 +40,21 @@ extern crate proc_macro2;
 
 use proc_macro::TokenStream;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, Signature, TraitItem, TraitItemMethod};
+use crate::parse::TraitContext;
+
+// --
+
+mod utilities;
+mod parse;
+
+// --
+
+#[proc_macro_attribute]
+pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let trait_context = parse_macro_input!(input as TraitContext);
+    trait_context.render_invoke_interface(attr)
+}
+
 
 // --
 #[proc_macro_attribute]
@@ -158,6 +173,8 @@ pub fn invoke_interface_with_persistency(_attr: TokenStream, input: TokenStream)
         })
         .collect();
     let ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
+    let _ident_async_vec: Vec<_> = idents_collected.iter().map(|i| Ident::new(
+        &format!("{}_with_callback", i.0), i.0.span())).collect();
     let idents_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
     let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
     let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
@@ -198,13 +215,6 @@ pub fn invoke_interface_with_persistency(_attr: TokenStream, input: TokenStream)
                 stringify!(#ident)
             }
         }
-        // impl<S> From<&[u8]> for #servant_ident<S>
-        // where for<'de> S: serde::Deserialize<'de>,
-        // {
-        //     fn from(bytes: &[u8]) -> Self {
-        //         bincode::deserialize(bytes).unwrap()
-        //     }
-        // }
         impl<S> servant::Servant for #servant_ident<S>
         where
             S: serde::Serialize + #ident + 'static,
@@ -257,6 +267,22 @@ pub fn invoke_interface_with_persistency(_attr: TokenStream, input: TokenStream)
                 response.map(|x| bincode::deserialize(&x).unwrap())
             }
             )*
+/*
+            #(
+            pub async fn #ident_async_vec(
+                &mut self,
+                #(#inputs_vec)* f: F
+            ) where F: 'static + Fn(Option<Oid>, ServantResult<Vec<u8>>) + Send,
+             -> servant::ServantResult<#output_vec> {
+                let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
+                let response = self
+                    .2
+                    .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+                    .await;
+                response.map(|x| bincode::deserialize(&x).unwrap())
+            }
+            )*
+*/
         }}
     } else {
         proc_macro2::TokenStream::new()
@@ -296,7 +322,7 @@ pub fn invoke_interface_with_persistency(_attr: TokenStream, input: TokenStream)
 /// ```
 #[cfg(feature = "invoke")]
 #[proc_macro_attribute]
-pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn invoke2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     // let derive_serde = parse_macro_input!(attr as DeriveSerde);
     let ItemTrait {
         attrs,
@@ -312,6 +338,7 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
         items,
         ..
     } = parse_macro_input!(input as ItemTrait);
+    let trait_ident = ident;
 
     let methods: Vec<TraitItemMethod> = items
         .iter()
@@ -348,12 +375,13 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 output,
                 ..
             } = sig;
+            let fn_ident = ident;
 
             let output_type = match output.clone() {
                 ReturnType::Default => quote! {()},
                 ReturnType::Type(_, t) => quote! {#t},
             };
-            let ident_camel = Ident::new(&snake_to_camel(&ident.to_string()), ident.span());
+            let fn_ident_camel = Ident::new(&snake_to_camel(&fn_ident.to_string()), fn_ident.span());
             let args: Vec<_> = inputs
                 .iter()
                 .map(|i| {
@@ -401,41 +429,41 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 .collect();
             let method = quote! {
                 #(#attrs)*
-                #constness #asyncness #unsafety #abi #fn_token #ident #generics (
+                #constness #asyncness #unsafety #abi #fn_token #fn_ident #generics (
                     #(#input_receiver)* ctx: Option<servant::Context>,
                     #(#inputs)* #variadic
                 ) #output
                 #default #semi_token
             };
-            (ident, ident_camel, args, inputs, method, output_type)
+            (fn_ident, fn_ident_camel, args, inputs, method, output_type)
         })
         .collect();
-    let ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
-    let idents_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
+    let fn_ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
+    let fn_ident_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
     let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
     let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
     let methods_vec: Vec<_> = idents_collected.iter().map(|i| i.4.clone()).collect();
     let output_vec: Vec<_> = idents_collected.iter().map(|i| i.5.clone()).collect();
 
-    let request_ident = Ident::new(&format!("{}Request", ident), ident.span());
+    let request_ident = Ident::new(&format!("{}Request", trait_ident), trait_ident.span());
     let request_ident_vect: Vec<_> = idents_collected
         .iter()
         .map(|_| request_ident.clone())
         .collect();
-    let servant_ident = Ident::new(&format!("{}Servant", ident), ident.span());
-    let proxy_ident = Ident::new(&format!("{}Proxy", ident), ident.span());
+    let servant_ident = Ident::new(&format!("{}Servant", trait_ident), trait_ident.span());
+    let proxy_ident = Ident::new(&format!("{}Proxy", trait_ident), trait_ident.span());
 
     let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
-            #(#idents_camel_vec { #(#inputs_vec)* },)*
+            #(#fn_ident_camel_vec { #(#inputs_vec)* },)*
         }}
     } else {
         proc_macro2::TokenStream::new()
     };
     let output2 = if cfg!(feature = "adapter") { quote! {
         #( #attrs )*
-        #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
+        #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
             #(#methods_vec)*
         }
         pub struct #servant_ident<S>
@@ -448,12 +476,12 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 Self { name: name.to_string(), entity }
             }
             pub fn category() -> &'static str {
-                stringify!(#ident)
+                stringify!(#trait_ident)
             }
         }
         impl<S> servant::Servant for #servant_ident<S>
         where
-            S: #ident + 'static,
+            S: #trait_ident + 'static,
         {
             fn name(&self) -> &str {
                 &self.name
@@ -462,8 +490,8 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
                 let req: #request_ident = bincode::deserialize(&req).unwrap();
                 let reps = match req {
                     #(
-                        #request_ident_vect::#idents_camel_vec{ #(#args_vec)* } =>
-                            bincode::serialize(&self.entity.#ident_vec(ctx, #(#args_vec)*)),
+                        #request_ident_vect::#fn_ident_camel_vec{ #(#args_vec)* } =>
+                            bincode::serialize(&self.entity.#fn_ident_vec(ctx, #(#args_vec)*)),
                     )*
                 }
                 .unwrap();
@@ -480,19 +508,19 @@ pub fn invoke_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
         impl #proxy_ident {
             pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
-                let oid = servant::Oid::new(name, stringify!(#ident));
+                let oid = servant::Oid::new(name, stringify!(#trait_ident));
                 Self(ctx, oid, t.clone())
             }
             pub fn category() -> &'static str {
-                stringify!(#ident)
+                stringify!(#trait_ident)
             }
 
             #(
-            pub async fn #ident_vec(
+            pub async fn #fn_ident_vec(
                 &mut self,
                 #(#inputs_vec)*
             ) -> servant::ServantResult<#output_vec> {
-                let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
+                let request =  #request_ident_vect::#fn_ident_camel_vec { #(#args_vec)* };
                 let response = self
                     .2
                     .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
