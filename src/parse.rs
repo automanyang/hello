@@ -3,22 +3,25 @@
 use crate::utilities::snake_to_camel;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use syn::parse::{Parse, ParseStream, Result};
 use syn::{
-    punctuated::Punctuated, token::Comma, FieldValue, FnArg, Ident, ItemTrait, Expr, Lit,
-    Member, ReturnType, Signature, TraitItem, TraitItemMethod,
+    parse::{Parse, ParseStream, Result},
+    punctuated::Punctuated,
+    spanned::Spanned,
+    token::Comma,
+    Error, Expr, FieldValue, FnArg, Ident, ItemTrait, Lit, Member, ReturnType, Signature,
+    TraitItem, TraitItemMethod,
 };
 
 // --
 
 #[cfg_attr(test, derive(Debug))]
-struct Attributes {
+struct InvokeInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
     persistency: Option<bool>,
     callback: Option<bool>,
 }
-impl Parse for Attributes {
+impl Parse for InvokeInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
             proxy: None,
@@ -26,49 +29,308 @@ impl Parse for Attributes {
             persistency: None,
             callback: None,
         };
-        // if input.is_empty() {
-        //     return Ok(r);
-        // }
 
         let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
-        fields.iter().for_each(|x| {
+        for x in fields.iter() {
             if let Member::Named(ref ident) = x.member {
                 match ident.to_string().as_str() {
                     "proxy" => {
                         if let Expr::Lit(ref proxy) = x.expr {
                             if let Lit::Str(ref proxy) = proxy.lit {
                                 r.proxy.replace(proxy.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"HelloProxy\"",
+                                ));
                             }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'proxy: \"HelloProxy\"'",
+                            ));
                         }
                     }
                     "servant" => {
                         if let Expr::Lit(ref servant) = x.expr {
                             if let Lit::Str(ref servant) = servant.lit {
                                 r.servant.replace(servant.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"HelloServant\"",
+                                ));
                             }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'servant: \"HelloServant\"'",
+                            ));
                         }
                     }
                     "persistency" => {
                         if let Expr::Lit(ref persistency) = x.expr {
                             if let Lit::Bool(ref persistency) = persistency.lit {
                                 r.persistency.replace(persistency.value);
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a Bool value, such as 'true'",
+                                ));
                             }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'persistency: true'",
+                            ));
                         }
                     }
                     "callback" => {
                         if let Expr::Lit(ref callback) = x.expr {
                             if let Lit::Bool(ref callback) = callback.lit {
                                 r.callback.replace(callback.value);
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a Bool value, such as 'true'",
+                                ));
                             }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'callback: true'",
+                            ));
                         }
                     }
-                    _ => {}
+                    _ => {
+                        return Err(Error::new(
+                            ident.span(),
+                            "expected `proxy, servant, persistency or callback` only.",
+                        ))
+                    }
                 }
+            } else {
+                return Err(Error::new(
+                    x.span(),
+                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
+                ));
             }
-        });
+        }
         Ok(r)
     }
 }
+
+// --
+
+#[cfg_attr(test, derive(Debug))]
+struct QueryInterfaceAttributes {
+    proxy: Option<String>,
+    servant: Option<String>,
+}
+impl Parse for QueryInterfaceAttributes {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut r = Self {
+            proxy: None,
+            servant: None,
+        };
+
+        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
+        for x in fields.iter() {
+            if let Member::Named(ref ident) = x.member {
+                match ident.to_string().as_str() {
+                    "proxy" => {
+                        if let Expr::Lit(ref proxy) = x.expr {
+                            if let Lit::Str(ref proxy) = proxy.lit {
+                                r.proxy.replace(proxy.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"QueryProxy\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'proxy: \"QueryProxy\"'",
+                            ));
+                        }
+                    }
+                    "servant" => {
+                        if let Expr::Lit(ref servant) = x.expr {
+                            if let Lit::Str(ref servant) = servant.lit {
+                                r.servant.replace(servant.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"QueryServant\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'servant: \"QueryServant\"'",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            ident.span(),
+                            "expected `proxy' or 'servant` only.",
+                        ))
+                    }
+                }
+            } else {
+                return Err(Error::new(
+                    x.span(),
+                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
+                ));
+            }
+        }
+        Ok(r)
+    }
+}
+
+// --
+
+#[cfg_attr(test, derive(Debug))]
+struct ReportInterfaceAttributes {
+    proxy: Option<String>,
+    servant: Option<String>,
+}
+impl Parse for ReportInterfaceAttributes {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut r = Self {
+            proxy: None,
+            servant: None,
+        };
+
+        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
+        for x in fields.iter() {
+            if let Member::Named(ref ident) = x.member {
+                match ident.to_string().as_str() {
+                    "proxy" => {
+                        if let Expr::Lit(ref proxy) = x.expr {
+                            if let Lit::Str(ref proxy) = proxy.lit {
+                                r.proxy.replace(proxy.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"ReportProxy\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'proxy: \"ReportProxy\"'",
+                            ));
+                        }
+                    }
+                    "servant" => {
+                        if let Expr::Lit(ref servant) = x.expr {
+                            if let Lit::Str(ref servant) = servant.lit {
+                                r.servant.replace(servant.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"ReportServant\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'servant: \"ReportServant\"'",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            ident.span(),
+                            "expected `proxy' or 'servant` only.",
+                        ))
+                    }
+                }
+            } else {
+                return Err(Error::new(
+                    x.span(),
+                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
+                ));
+            }
+        }
+        Ok(r)
+    }
+}
+
+// --
+
+#[cfg_attr(test, derive(Debug))]
+struct NotifyInterfaceAttributes {
+    receiver: Option<String>,
+    notifier: Option<String>,
+}
+impl Parse for NotifyInterfaceAttributes {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut r = Self {
+            receiver: None,
+            notifier: None,
+        };
+
+        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
+        for x in fields.iter() {
+            if let Member::Named(ref ident) = x.member {
+                match ident.to_string().as_str() {
+                    "receiver" => {
+                        if let Expr::Lit(ref l) = x.expr {
+                            if let Lit::Str(ref s) = l.lit {
+                                r.receiver.replace(s.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"HelloReceiver\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'receiver: \"HelloReceiver\"'",
+                            ));
+                        }
+                    }
+                    "notifier" => {
+                        if let Expr::Lit(ref l) = x.expr {
+                            if let Lit::Str(ref s) = l.lit {
+                                r.notifier.replace(s.value());
+                            } else {
+                                return Err(Error::new(
+                                    ident.span(),
+                                    "expected a &'static str value, such as \"HelloNotifier\"",
+                                ));
+                            }
+                        } else {
+                            return Err(Error::new(
+                                ident.span(),
+                                "expected a value, such as 'servant: \"HelloNotifier\"'",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            ident.span(),
+                            "expected `proxy' or 'servant` only.",
+                        ))
+                    }
+                }
+            } else {
+                return Err(Error::new(
+                    x.span(),
+                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
+                ));
+            }
+        }
+        Ok(r)
+    }
+}
+
+// --
 
 #[cfg_attr(test, derive(Debug))]
 pub struct TraitContext {
@@ -77,12 +339,11 @@ pub struct TraitContext {
     fn_ident_camel_vec: Vec<Ident>,
     args_vec: Vec<Vec<TokenStream2>>,
     inputs_vec: Vec<Vec<TokenStream2>>,
-    method_vec: Vec<TokenStream2>,
+    method_with_context_vec: Vec<TokenStream2>,
+    method_vec: Vec<TraitItemMethod>,
     output_vec: Vec<TokenStream2>,
     request_ident_vec: Vec<Ident>,
     request_ident: Ident,
-    servant_ident: Ident,
-    proxy_ident: Ident,
 }
 
 impl Parse for TraitContext {
@@ -90,7 +351,7 @@ impl Parse for TraitContext {
         let item_trait: ItemTrait = input.parse()?;
         let trait_ident = item_trait.ident.clone();
 
-        let methods: Vec<TraitItemMethod> = item_trait
+        let method_vec: Vec<TraitItemMethod> = item_trait
             .items
             .iter()
             .map(|i| {
@@ -103,7 +364,7 @@ impl Parse for TraitContext {
             .filter(|i| i.is_some())
             .map(|x| x.unwrap().clone())
             .collect();
-        let idents_collected: Vec<_> = methods
+        let idents_collected: Vec<_> = method_vec
             .iter()
             .map(|x| {
                 let TraitItemMethod {
@@ -179,7 +440,7 @@ impl Parse for TraitContext {
                         quote! {#x,}
                     })
                     .collect();
-                let method = quote! {
+                let method_with_context = quote! {
                     #(#attrs)*
                     #constness #asyncness #unsafety #abi #fn_token #fn_ident #generics (
                         #(#input_receiver)* ctx: Option<servant::Context>,
@@ -187,14 +448,22 @@ impl Parse for TraitContext {
                     ) #output
                     #default #semi_token
                 };
-                (fn_ident, fn_ident_camel, args, inputs, method, output_type)
+                (
+                    fn_ident,
+                    fn_ident_camel,
+                    args,
+                    inputs,
+                    method_with_context,
+                    output_type,
+                )
             })
             .collect();
         let fn_ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
         let fn_ident_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
         let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
         let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
-        let method_vec: Vec<_> = idents_collected.iter().map(|i| i.4.clone()).collect();
+        let method_with_context_vec: Vec<_> =
+            idents_collected.iter().map(|i| i.4.clone()).collect();
         let output_vec: Vec<_> = idents_collected.iter().map(|i| i.5.clone()).collect();
 
         let request_ident = format_ident!("{}Request", trait_ident);
@@ -202,8 +471,6 @@ impl Parse for TraitContext {
             .iter()
             .map(|_| request_ident.clone())
             .collect();
-        let servant_ident = format_ident!("{}Servant", trait_ident);
-        let proxy_ident = format_ident!("{}Proxy", trait_ident);
 
         Ok(Self {
             item_trait,
@@ -211,31 +478,30 @@ impl Parse for TraitContext {
             fn_ident_camel_vec,
             args_vec,
             inputs_vec,
+            method_with_context_vec,
             method_vec,
             output_vec,
             request_ident_vec,
             request_ident,
-            servant_ident,
-            proxy_ident,
         })
     }
 }
 
 impl TraitContext {
     pub fn render_invoke_interface(&self, attr: TokenStream) -> TokenStream {
-        let attributes = parse_macro_input!(attr as Attributes);
+        let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
         let TraitContext {
             item_trait,
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
             inputs_vec,
-            method_vec,
+            method_with_context_vec,
+            // method_vec,
             output_vec,
             request_ident_vec,
             request_ident,
-            servant_ident,
-            proxy_ident,
+            ..
         } = self;
         let ItemTrait {
             attrs,
@@ -252,6 +518,16 @@ impl TraitContext {
             ..
         } = item_trait;
         let trait_ident = ident;
+        let servant_ident = if let Some(s) = attributes.servant {
+            Ident::new(&s, trait_ident.span())
+        } else {
+            format_ident!("{}Servant", trait_ident)
+        };
+        let proxy_ident = if let Some(p) = attributes.proxy {
+            Ident::new(&p, trait_ident.span())
+        } else {
+            format_ident!("{}Proxy", trait_ident)
+        };
 
         let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
             quote! {
@@ -268,7 +544,7 @@ impl TraitContext {
             Some(p) if p => quote! {
                 impl<S> servant::Servant for #servant_ident<S>
                 where
-                    S: serde::Serialize + #ident + 'static,
+                    S: serde::Serialize + #trait_ident + 'static,
                 {
                     fn name(&self) -> &str {
                         &self.name
@@ -309,13 +585,13 @@ impl TraitContext {
                         reps
                     }
                 }
-            }
+            },
         };
         let output2 = if cfg!(feature = "adapter") {
             quote! {
                 #( #attrs )*
                 #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
-                    #(#method_vec)*
+                    #(#method_with_context_vec)*
                 }
                 pub struct #servant_ident<S>
                 {
@@ -355,7 +631,7 @@ impl TraitContext {
                         &mut self,
                         #(#inputs_vec)*
                     ) -> servant::ServantResult<#output_vec> {
-                        let request =  #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
                         let response = self
                             .2
                             .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
@@ -376,7 +652,7 @@ impl TraitContext {
             }
             _ => quote! {
                 fn cb_false() {}
-            }
+            },
         };
 
         let output = quote! {
@@ -387,12 +663,395 @@ impl TraitContext {
         };
         output.into()
     }
-    // pub fn render_query_interface(&self, _attr: TokenStream) -> TokenStream {
-    // }
-    // pub fn render_report_interface(&self, _attr: TokenStream) -> TokenStream {
-    // }
-    // pub fn render_notify_interface(&self, _attr: TokenStream) -> TokenStream {
-    // }
+
+    pub fn render_query_interface(&self, attr: TokenStream) -> TokenStream {
+        let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
+        let TraitContext {
+            item_trait,
+            fn_ident_vec,
+            fn_ident_camel_vec,
+            args_vec,
+            inputs_vec,
+            // method_with_context_vec,
+            method_vec,
+            output_vec,
+            request_ident_vec,
+            request_ident,
+            ..
+        } = self;
+        let ItemTrait {
+            attrs,
+            vis,
+            unsafety,
+            auto_token,
+            trait_token,
+            ident,
+            generics,
+            colon_token,
+            supertraits,
+            // brace_token,
+            // items,
+            ..
+        } = item_trait;
+        let trait_ident = ident;
+        let servant_ident = if let Some(s) = attributes.servant {
+            Ident::new(&s, trait_ident.span())
+        } else {
+            format_ident!("{}Servant", trait_ident)
+        };
+        let proxy_ident = if let Some(p) = attributes.proxy {
+            Ident::new(&p, trait_ident.span())
+        } else {
+            format_ident!("{}Proxy", trait_ident)
+        };
+
+        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+            quote! {
+                #[derive(serde::Serialize, serde::Deserialize)]
+                enum #request_ident {
+                    #(#fn_ident_camel_vec { #(#inputs_vec)* },)*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output2 = if cfg!(feature = "adapter") {
+            quote! {
+                #( #attrs )*
+                #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
+                    #(#method_vec)*
+                }
+                pub struct #servant_ident<S> {
+                    entity: S,
+                }
+                impl<S> #servant_ident<S> {
+                    pub fn new(entity: S) -> Self {
+                        Self { entity }
+                    }
+                    pub fn category() -> &'static str {
+                        stringify!(#trait_ident)
+                    }
+                }
+                impl<S> servant::QueryServant for #servant_ident<S>
+                where
+                    S: #trait_ident + 'static,
+                {
+                    fn serve(&mut self, req: Vec<u8>) -> Vec<u8> {
+                        let req: #request_ident = bincode::deserialize(&req).unwrap();
+                        let reps = match req {
+                            #(
+                                #request_ident_vec::#fn_ident_camel_vec{ #(#args_vec)* } =>
+                                    bincode::serialize(&self.entity.#fn_ident_vec(#(#args_vec)*)),
+                            )*
+                        }
+                        .unwrap();
+                        reps
+                    }
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output3 = if cfg!(feature = "terminal") {
+            quote! {
+                #[derive(Clone)]
+                pub struct #proxy_ident(servant::Terminal);
+
+                impl #proxy_ident {
+                    pub fn new(t: &servant::Terminal) -> Self {
+                        Self(t.clone())
+                    }
+                    pub fn category() -> &'static str {
+                        stringify!(#ident)
+                    }
+
+                    #(
+                    pub async fn #fn_ident_vec(
+                        &mut self,
+                        #(#inputs_vec)*
+                    ) -> servant::ServantResult<#output_vec> {
+                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                        let response = self
+                            .0
+                            .invoke(None, None, bincode::serialize(&request).unwrap())
+                            .await;
+                        response.map(|x| bincode::deserialize(&x).unwrap())
+                    }
+                    )*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output = quote! {
+            #output1
+            #output2
+            #output3
+        };
+        output.into()
+    }
+
+    pub fn render_report_interface(&self, attr: TokenStream) -> TokenStream {
+        let attributes = parse_macro_input!(attr as ReportInterfaceAttributes);
+        let TraitContext {
+            item_trait,
+            fn_ident_vec,
+            fn_ident_camel_vec,
+            args_vec,
+            inputs_vec,
+            // method_with_context_vec,
+            method_vec,
+            // output_vec,
+            request_ident_vec,
+            request_ident,
+            ..
+        } = self;
+        let ItemTrait {
+            attrs,
+            vis,
+            unsafety,
+            auto_token,
+            trait_token,
+            ident,
+            generics,
+            colon_token,
+            supertraits,
+            // brace_token,
+            // items,
+            ..
+        } = item_trait;
+        let trait_ident = ident;
+        let servant_ident = if let Some(s) = attributes.servant {
+            Ident::new(&s, trait_ident.span())
+        } else {
+            format_ident!("{}ReportServant", trait_ident)
+        };
+        let proxy_ident = if let Some(p) = attributes.proxy {
+            Ident::new(&p, trait_ident.span())
+        } else {
+            format_ident!("{}ReportProxy", trait_ident)
+        };
+
+        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+            quote! {
+                #[derive(serde::Serialize, serde::Deserialize)]
+                enum #request_ident {
+                    #(#fn_ident_camel_vec { #(#inputs_vec)* },)*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output2 = if cfg!(feature = "adapter") {
+            quote! {
+                #( #attrs )*
+                #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
+                    #(#method_vec)*
+                }
+                pub struct #servant_ident<S> {
+                    name: String,
+                    entity: S,
+                }
+                impl<S> #servant_ident<S> {
+                    pub fn new(name: &str, entity: S) -> Self {
+                        Self { name: name.to_string(), entity }
+                    }
+                    pub fn category() -> &'static str {
+                        stringify!(#trait_ident)
+                    }
+                }
+                impl<S> servant::ReportServant for #servant_ident<S>
+                where
+                    S: #trait_ident + 'static,
+                {
+                    fn name(&self) -> &str {
+                        &self.name
+                    }
+                    fn serve(&mut self, req: Vec<u8>) {
+                        let req: #request_ident = bincode::deserialize(&req).unwrap();
+                        match req {
+                            #(
+                                #request_ident_vec::#fn_ident_camel_vec{ #(#args_vec)* } =>
+                                    self.entity.#fn_ident_vec(#(#args_vec)*),
+                            )*
+                        }
+                    }
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output3 = if cfg!(feature = "terminal") {
+            quote! {
+                #[derive(Clone)]
+                pub struct #proxy_ident(servant::Oid, servant::Terminal);
+
+                impl #proxy_ident {
+                    pub fn new(name: &str, t: &servant::Terminal) -> Self {
+                        let oid = servant::Oid::new(name, stringify!(#trait_ident));
+                        Self(oid, t.clone())
+                    }
+                    pub fn category() -> &'static str {
+                        stringify!(#trait_ident)
+                    }
+
+                    #(
+                    pub async fn #fn_ident_vec(
+                        &mut self,
+                        #(#inputs_vec)*
+                    ) -> servant::ServantResult<()> {
+                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                        let response = self
+                            .1
+                            .report(self.0.clone(), bincode::serialize(&request).unwrap())
+                            .await;
+                        response
+                    }
+                    )*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output = quote! {
+            #output1
+            #output2
+            #output3
+        };
+        output.into()
+    }
+
+    pub fn render_notify_interface(&self, attr: TokenStream) -> TokenStream {
+        let attributes = parse_macro_input!(attr as NotifyInterfaceAttributes);
+        let TraitContext {
+            item_trait,
+            fn_ident_vec,
+            fn_ident_camel_vec,
+            args_vec,
+            inputs_vec,
+            // method_with_context_vec,
+            method_vec,
+            // output_vec,
+            request_ident_vec,
+            request_ident,
+            ..
+        } = self;
+        let ItemTrait {
+            attrs,
+            vis,
+            unsafety,
+            auto_token,
+            trait_token,
+            ident,
+            generics,
+            colon_token,
+            supertraits,
+            // brace_token,
+            // items,
+            ..
+        } = item_trait;
+        let trait_ident = ident;
+        let receiver_ident = if let Some(s) = attributes.receiver {
+            Ident::new(&s, trait_ident.span())
+        } else {
+            format_ident!("{}Receiver", trait_ident)
+        };
+        let notifier_ident = if let Some(p) = attributes.notifier {
+            Ident::new(&p, trait_ident.span())
+        } else {
+            format_ident!("{}Notifier", trait_ident)
+        };
+
+        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+            quote! {
+                #[derive(serde::Serialize, serde::Deserialize)]
+                enum #request_ident {
+                    #(#fn_ident_camel_vec { #(#inputs_vec)* },)*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output2 = if cfg!(feature = "terminal") {
+            quote! {
+                #( #attrs )*
+                #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
+                    #(#method_vec)*
+                }
+                pub struct #receiver_ident<S> {
+                    entity: S,
+                }
+                impl<S> #receiver_ident<S> {
+                    pub fn new(entity: S) -> Self {
+                        Self { entity }
+                    }
+                }
+                impl<S> servant::NotifyServant for #receiver_ident<S>
+                where
+                    S: #ident + 'static + Send,
+                {
+                    fn serve(&mut self, req: Vec<u8>) {
+                        let req: #request_ident = bincode::deserialize(&req).unwrap();
+                        match req {
+                            #(
+                                #request_ident_vec::#fn_ident_camel_vec{ #(#args_vec)* } =>
+                                    self.entity.#fn_ident_vec(#(#args_vec)*),
+                            )*
+                        }
+                    }
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output3 = if cfg!(feature = "adapter") {
+            quote! {
+                pub struct #notifier_ident(&'static servant::AdapterRegister);
+
+                impl #notifier_ident {
+                    pub fn instance() -> &'static #notifier_ident {
+                        static mut NOTIFIER: Option<#notifier_ident> = None;
+                        static INIT: std::sync::Once = std::sync::Once::new();
+                        unsafe {
+                            INIT.call_once(|| {
+                                NOTIFIER = Some(#notifier_ident(servant::AdapterRegister::instance()));
+                            });
+                            NOTIFIER.as_ref().unwrap()
+                        }
+                    }
+                    #(
+                    pub async fn #fn_ident_vec(
+                        &self,
+                        #(#inputs_vec)*
+                    )  {
+                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                        self
+                            .0
+                            .send(bincode::serialize(&request).unwrap())
+                            .await
+                    }
+                    )*
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        };
+
+        let output = quote! {
+            #output1
+            #output2
+            #output3
+        };
+        output.into()
+    }
 }
 
 // --
@@ -403,14 +1062,20 @@ mod tests {
 
     #[test]
     fn test_attr_parse() {
-        // let attr: TokenStream = quote! {
-        //     proxy="ppp", servant = "ssss", persistency = true, callback = false
-        // }.into();
-        // proxy="ppp", servant = "ssss", persistency = true, callback = false
-        let attributes: Attributes = parse_quote! {
-             proxy: "ppp", callback: false, persistency: true, servant: "ssss"
+        let attributes: InvokeInterfaceAttributes = parse_quote! {
+             proxy1: "ppp", callback: false, persistency: true, servant: "ssss"
         };
         dbg!(&attributes);
-        // dbg!(1);
+    }
+
+    #[test]
+    fn test_invoke_parse() {
+        let trait_context: TraitContext = parse_quote! {
+            pub trait Hello3 {
+                type Item;
+                fn hi(&self, name: String) -> String;
+            }
+        };
+        dbg!(&trait_context);
     }
 }
