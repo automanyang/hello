@@ -38,10 +38,6 @@ extern crate proc_macro2;
 
 // --
 
-use crate::parse::{
-    InvokeInterfaceAttributes, NotifyInterfaceAttributes, QueryInterfaceAttributes,
-    ReportInterfaceAttributes, TraitContext,
-};
 use proc_macro::TokenStream;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, Signature, TraitItem, TraitItemMethod};
 
@@ -79,8 +75,8 @@ mod utilities;
 #[cfg(feature = "invoke")]
 #[proc_macro_attribute]
 pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
-    let trait_context = parse_macro_input!(input as TraitContext);
+    let attributes = parse_macro_input!(attr as parse::InvokeInterfaceAttributes);
+    let trait_context = parse_macro_input!(input as parse::TraitContext);
     trait_context.render_invoke_interface(&attributes)
 }
 
@@ -114,8 +110,8 @@ pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "query")]
 #[proc_macro_attribute]
 pub fn query_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attributes = parse_macro_input!(attr as QueryInterfaceAttributes);
-    let trait_context = parse_macro_input!(input as TraitContext);
+    let attributes = parse_macro_input!(attr as parse::QueryInterfaceAttributes);
+    let trait_context = parse_macro_input!(input as parse::TraitContext);
     trait_context.render_query_interface(&attributes)
 }
 
@@ -148,8 +144,8 @@ pub fn query_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "report")]
 #[proc_macro_attribute]
 pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attributes = parse_macro_input!(attr as ReportInterfaceAttributes);
-    let trait_context = parse_macro_input!(input as TraitContext);
+    let attributes = parse_macro_input!(attr as parse::ReportInterfaceAttributes);
+    let trait_context = parse_macro_input!(input as parse::TraitContext);
     trait_context.render_report_interface(&attributes)
 }
 
@@ -181,8 +177,8 @@ pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "notify")]
 #[proc_macro_attribute]
 pub fn notify_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attributes = parse_macro_input!(attr as NotifyInterfaceAttributes);
-    let trait_context = parse_macro_input!(input as TraitContext);
+    let attributes = parse_macro_input!(attr as parse::NotifyInterfaceAttributes);
+    let trait_context = parse_macro_input!(input as parse::TraitContext);
     trait_context.render_notify_interface(&attributes)
 }
 

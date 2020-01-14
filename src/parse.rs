@@ -14,13 +14,15 @@ use syn::{
 
 // --
 
+#[cfg(feature = "invoke")]
 #[cfg_attr(test, derive(Debug))]
-pub struct InvokeInterfaceAttributes {
+pub(crate) struct InvokeInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
     persistency: Option<bool>,
     callback: Option<bool>,
 }
+#[cfg(feature = "invoke")]
 impl Parse for InvokeInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -122,11 +124,13 @@ impl Parse for InvokeInterfaceAttributes {
 
 // --
 
+#[cfg(feature = "query")]
 #[cfg_attr(test, derive(Debug))]
-pub struct QueryInterfaceAttributes {
+pub(crate) struct QueryInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
+#[cfg(feature = "query")]
 impl Parse for QueryInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -192,11 +196,13 @@ impl Parse for QueryInterfaceAttributes {
 
 // --
 
+#[cfg(feature = "report")]
 #[cfg_attr(test, derive(Debug))]
-pub struct ReportInterfaceAttributes {
+pub(crate) struct ReportInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
+#[cfg(feature = "report")]
 impl Parse for ReportInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -262,11 +268,13 @@ impl Parse for ReportInterfaceAttributes {
 
 // --
 
+#[cfg(feature = "notify")]
 #[cfg_attr(test, derive(Debug))]
-pub struct NotifyInterfaceAttributes {
+pub(crate) struct NotifyInterfaceAttributes {
     receiver: Option<String>,
     notifier: Option<String>,
 }
+#[cfg(feature = "notify")]
 impl Parse for NotifyInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -331,9 +339,9 @@ impl Parse for NotifyInterfaceAttributes {
 }
 
 // --
-
+#[cfg(any(feature = "invoke", feature = "query", feature = "report", feature = "notify"))]
 #[cfg_attr(test, derive(Debug))]
-pub struct TraitContext {
+pub(crate) struct TraitContext {
     item_trait: ItemTrait,
     fn_ident_vec: Vec<Ident>,
     fn_ident_camel_vec: Vec<Ident>,
@@ -346,6 +354,7 @@ pub struct TraitContext {
     request_ident: Ident,
 }
 
+#[cfg(any(feature = "invoke", feature = "query", feature = "report", feature = "notify"))]
 impl Parse for TraitContext {
     fn parse(input: ParseStream) -> Result<Self> {
         let item_trait: ItemTrait = input.parse()?;
@@ -488,7 +497,8 @@ impl Parse for TraitContext {
 }
 
 impl TraitContext {
-    pub fn render_invoke_interface(&self, attributes: &InvokeInterfaceAttributes) -> TokenStream {
+    #[cfg(feature = "invoke")]
+    pub(crate) fn render_invoke_interface(&self, attributes: &InvokeInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -663,7 +673,8 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_query_interface(&self, attributes: &QueryInterfaceAttributes) -> TokenStream {
+    #[cfg(feature = "query")]
+    pub(crate) fn render_query_interface(&self, attributes: &QueryInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -792,7 +803,8 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_report_interface(&self, attributes: &ReportInterfaceAttributes) -> TokenStream {
+    #[cfg(feature = "report")]
+    pub(crate) fn render_report_interface(&self, attributes: &ReportInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -924,7 +936,8 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_notify_interface(&self, attributes: &NotifyInterfaceAttributes) -> TokenStream {
+    #[cfg(feature = "notify")]
+    pub(crate) fn render_notify_interface(&self, attributes: &NotifyInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
