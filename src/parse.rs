@@ -15,7 +15,7 @@ use syn::{
 // --
 
 #[cfg_attr(test, derive(Debug))]
-struct InvokeInterfaceAttributes {
+pub struct InvokeInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
     persistency: Option<bool>,
@@ -123,7 +123,7 @@ impl Parse for InvokeInterfaceAttributes {
 // --
 
 #[cfg_attr(test, derive(Debug))]
-struct QueryInterfaceAttributes {
+pub struct QueryInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
@@ -193,7 +193,7 @@ impl Parse for QueryInterfaceAttributes {
 // --
 
 #[cfg_attr(test, derive(Debug))]
-struct ReportInterfaceAttributes {
+pub struct ReportInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
@@ -263,7 +263,7 @@ impl Parse for ReportInterfaceAttributes {
 // --
 
 #[cfg_attr(test, derive(Debug))]
-struct NotifyInterfaceAttributes {
+pub struct NotifyInterfaceAttributes {
     receiver: Option<String>,
     notifier: Option<String>,
 }
@@ -488,8 +488,7 @@ impl Parse for TraitContext {
 }
 
 impl TraitContext {
-    pub fn render_invoke_interface(&self, attr: TokenStream) -> TokenStream {
-        let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
+    pub fn render_invoke_interface(&self, attributes: &InvokeInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -518,12 +517,12 @@ impl TraitContext {
             ..
         } = item_trait;
         let trait_ident = ident;
-        let servant_ident = if let Some(s) = attributes.servant {
+        let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
         } else {
             format_ident!("{}Servant", trait_ident)
         };
-        let proxy_ident = if let Some(p) = attributes.proxy {
+        let proxy_ident = if let Some(ref p) = attributes.proxy {
             Ident::new(&p, trait_ident.span())
         } else {
             format_ident!("{}Proxy", trait_ident)
@@ -664,8 +663,7 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_query_interface(&self, attr: TokenStream) -> TokenStream {
-        let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
+    pub fn render_query_interface(&self, attributes: &QueryInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -694,12 +692,12 @@ impl TraitContext {
             ..
         } = item_trait;
         let trait_ident = ident;
-        let servant_ident = if let Some(s) = attributes.servant {
+        let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
         } else {
             format_ident!("{}Servant", trait_ident)
         };
-        let proxy_ident = if let Some(p) = attributes.proxy {
+        let proxy_ident = if let Some(ref p) = attributes.proxy {
             Ident::new(&p, trait_ident.span())
         } else {
             format_ident!("{}Proxy", trait_ident)
@@ -794,8 +792,7 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_report_interface(&self, attr: TokenStream) -> TokenStream {
-        let attributes = parse_macro_input!(attr as ReportInterfaceAttributes);
+    pub fn render_report_interface(&self, attributes: &ReportInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -824,12 +821,12 @@ impl TraitContext {
             ..
         } = item_trait;
         let trait_ident = ident;
-        let servant_ident = if let Some(s) = attributes.servant {
+        let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
         } else {
             format_ident!("{}ReportServant", trait_ident)
         };
-        let proxy_ident = if let Some(p) = attributes.proxy {
+        let proxy_ident = if let Some(ref p) = attributes.proxy {
             Ident::new(&p, trait_ident.span())
         } else {
             format_ident!("{}ReportProxy", trait_ident)
@@ -927,8 +924,7 @@ impl TraitContext {
         output.into()
     }
 
-    pub fn render_notify_interface(&self, attr: TokenStream) -> TokenStream {
-        let attributes = parse_macro_input!(attr as NotifyInterfaceAttributes);
+    pub fn render_notify_interface(&self, attributes: &NotifyInterfaceAttributes) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -957,12 +953,12 @@ impl TraitContext {
             ..
         } = item_trait;
         let trait_ident = ident;
-        let receiver_ident = if let Some(s) = attributes.receiver {
+        let receiver_ident = if let Some(ref s) = attributes.receiver {
             Ident::new(&s, trait_ident.span())
         } else {
             format_ident!("{}Receiver", trait_ident)
         };
-        let notifier_ident = if let Some(p) = attributes.notifier {
+        let notifier_ident = if let Some(ref p) = attributes.notifier {
             Ident::new(&p, trait_ident.span())
         } else {
             format_ident!("{}Notifier", trait_ident)
@@ -1070,6 +1066,10 @@ mod tests {
 
     #[test]
     fn test_invoke_parse() {
+        let attributes: InvokeInterfaceAttributes = parse_quote! {
+            proxy: "ppp", callback: false, persistency: true, servant: "ssss"
+        };
+        dbg!(&attributes);
         let trait_context: TraitContext = parse_quote! {
             pub trait Hello3 {
                 type Item;
@@ -1077,5 +1077,8 @@ mod tests {
             }
         };
         dbg!(&trait_context);
+
+        // let o = trait_context.render_invoke_interface(attributes);
+        // dbg!(&o);
     }
 }

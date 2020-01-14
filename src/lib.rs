@@ -38,17 +38,19 @@ extern crate proc_macro2;
 
 // --
 
+use crate::parse::{
+    InvokeInterfaceAttributes, NotifyInterfaceAttributes, QueryInterfaceAttributes,
+    ReportInterfaceAttributes, TraitContext,
+};
 use proc_macro::TokenStream;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, Signature, TraitItem, TraitItemMethod};
-use crate::parse::TraitContext;
 
 // --
 
-mod utilities;
 mod parse;
+mod utilities;
 
 // --
-
 
 /// 定义带返回值方法的接口，接口中可以有多个带返回值的方法。
 ///
@@ -77,8 +79,9 @@ mod parse;
 #[cfg(feature = "invoke")]
 #[proc_macro_attribute]
 pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attributes = parse_macro_input!(attr as InvokeInterfaceAttributes);
     let trait_context = parse_macro_input!(input as TraitContext);
-    trait_context.render_invoke_interface(attr)
+    trait_context.render_invoke_interface(&attributes)
 }
 
 /// 定义query接口，query接口实际上就是一个invoke接口。
@@ -111,8 +114,9 @@ pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "query")]
 #[proc_macro_attribute]
 pub fn query_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attributes = parse_macro_input!(attr as QueryInterfaceAttributes);
     let trait_context = parse_macro_input!(input as TraitContext);
-    trait_context.render_query_interface(attr)
+    trait_context.render_query_interface(&attributes)
 }
 
 /// 定义不带返回值方法的接口，接口中可以有多个不带返回值的方法。
@@ -144,8 +148,9 @@ pub fn query_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "report")]
 #[proc_macro_attribute]
 pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attributes = parse_macro_input!(attr as ReportInterfaceAttributes);
     let trait_context = parse_macro_input!(input as TraitContext);
-    trait_context.render_report_interface(attr)
+    trait_context.render_report_interface(&attributes)
 }
 
 /// 定义notify接口，notify接口中的方法不能有返回值。
@@ -176,8 +181,9 @@ pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(feature = "notify")]
 #[proc_macro_attribute]
 pub fn notify_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attributes = parse_macro_input!(attr as NotifyInterfaceAttributes);
     let trait_context = parse_macro_input!(input as TraitContext);
-    trait_context.render_notify_interface(attr)
+    trait_context.render_notify_interface(&attributes)
 }
 
 // --
@@ -298,8 +304,10 @@ pub fn invoke2_interface_with_persistency(_attr: TokenStream, input: TokenStream
         })
         .collect();
     let ident_vec: Vec<_> = idents_collected.iter().map(|i| i.0.clone()).collect();
-    let _ident_async_vec: Vec<_> = idents_collected.iter().map(|i| Ident::new(
-        &format!("{}_with_callback", i.0), i.0.span())).collect();
+    let _ident_async_vec: Vec<_> = idents_collected
+        .iter()
+        .map(|i| Ident::new(&format!("{}_with_callback", i.0), i.0.span()))
+        .collect();
     let idents_camel_vec: Vec<_> = idents_collected.iter().map(|i| i.1.clone()).collect();
     let args_vec: Vec<_> = idents_collected.iter().map(|i| i.2.clone()).collect();
     let inputs_vec: Vec<_> = idents_collected.iter().map(|i| i.3.clone()).collect();
@@ -314,7 +322,8 @@ pub fn invoke2_interface_with_persistency(_attr: TokenStream, input: TokenStream
     let servant_ident = Ident::new(&format!("{}Servant", ident), ident.span());
     let proxy_ident = Ident::new(&format!("{}Proxy", ident), ident.span());
 
-    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
             #(#idents_camel_vec { #(#inputs_vec)* },)*
@@ -322,7 +331,8 @@ pub fn invoke2_interface_with_persistency(_attr: TokenStream, input: TokenStream
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output2 = if cfg!(feature = "adapter") { quote! {
+    let output2 = if cfg!(feature = "adapter") {
+        quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
             #(#methods_vec)*
@@ -366,49 +376,50 @@ pub fn invoke2_interface_with_persistency(_attr: TokenStream, input: TokenStream
         proc_macro2::TokenStream::new()
     };
 
-    let output3 = if cfg!(feature = "terminal") { quote!{
-        #[derive(Clone)]
-        pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
+    let output3 = if cfg!(feature = "terminal") {
+        quote! {
+                #[derive(Clone)]
+                pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
 
-        impl #proxy_ident {
-            pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
-                let oid = servant::Oid::new(name, stringify!(#ident));
-                Self(ctx, oid, t.clone())
-            }
-            pub fn category() -> &'static str {
-                stringify!(#ident)
-            }
+                impl #proxy_ident {
+                    pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
+                        let oid = servant::Oid::new(name, stringify!(#ident));
+                        Self(ctx, oid, t.clone())
+                    }
+                    pub fn category() -> &'static str {
+                        stringify!(#ident)
+                    }
 
-            #(
-            pub async fn #ident_vec(
-                &mut self,
-                #(#inputs_vec)*
-            ) -> servant::ServantResult<#output_vec> {
-                let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
-                let response = self
-                    .2
-                    .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
-                    .await;
-                response.map(|x| bincode::deserialize(&x).unwrap())
-            }
-            )*
-/*
-            #(
-            pub async fn #ident_async_vec(
-                &mut self,
-                #(#inputs_vec)* f: F
-            ) where F: 'static + Fn(Option<Oid>, ServantResult<Vec<u8>>) + Send,
-             -> servant::ServantResult<#output_vec> {
-                let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
-                let response = self
-                    .2
-                    .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
-                    .await;
-                response.map(|x| bincode::deserialize(&x).unwrap())
-            }
-            )*
-*/
-        }}
+                    #(
+                    pub async fn #ident_vec(
+                        &mut self,
+                        #(#inputs_vec)*
+                    ) -> servant::ServantResult<#output_vec> {
+                        let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
+                        let response = self
+                            .2
+                            .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+                            .await;
+                        response.map(|x| bincode::deserialize(&x).unwrap())
+                    }
+                    )*
+        /*
+                    #(
+                    pub async fn #ident_async_vec(
+                        &mut self,
+                        #(#inputs_vec)* f: F
+                    ) where F: 'static + Fn(Option<Oid>, ServantResult<Vec<u8>>) + Send,
+                     -> servant::ServantResult<#output_vec> {
+                        let request =  #request_ident_vect::#idents_camel_vec { #(#args_vec)* };
+                        let response = self
+                            .2
+                            .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+                            .await;
+                        response.map(|x| bincode::deserialize(&x).unwrap())
+                    }
+                    )*
+        */
+                }}
     } else {
         proc_macro2::TokenStream::new()
     };
@@ -481,7 +492,8 @@ pub fn invoke2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
                 ReturnType::Default => quote! {()},
                 ReturnType::Type(_, t) => quote! {#t},
             };
-            let fn_ident_camel = Ident::new(&snake_to_camel(&fn_ident.to_string()), fn_ident.span());
+            let fn_ident_camel =
+                Ident::new(&snake_to_camel(&fn_ident.to_string()), fn_ident.span());
             let args: Vec<_> = inputs
                 .iter()
                 .map(|i| {
@@ -553,7 +565,8 @@ pub fn invoke2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     let servant_ident = Ident::new(&format!("{}Servant", trait_ident), trait_ident.span());
     let proxy_ident = Ident::new(&format!("{}Proxy", trait_ident), trait_ident.span());
 
-    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
             #(#fn_ident_camel_vec { #(#inputs_vec)* },)*
@@ -561,7 +574,8 @@ pub fn invoke2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output2 = if cfg!(feature = "adapter") { quote! {
+    let output2 = if cfg!(feature = "adapter") {
+        quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
             #(#methods_vec)*
@@ -602,7 +616,8 @@ pub fn invoke2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
         proc_macro2::TokenStream::new()
     };
 
-    let output3 = if cfg!(feature = "terminal") { quote!{
+    let output3 = if cfg!(feature = "terminal") {
+        quote! {
         #[derive(Clone)]
         pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
 
@@ -749,7 +764,8 @@ pub fn report2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     let servant_ident = Ident::new(&format!("{}ReportServant", ident), ident.span());
     let proxy_ident = Ident::new(&format!("{}ReportProxy", ident), ident.span());
 
-    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
             #(#idents_camel_vec { #(#inputs_vec)* },)*
@@ -757,7 +773,8 @@ pub fn report2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output2 = if cfg!(feature = "adapter") { quote! {
+    let output2 = if cfg!(feature = "adapter") {
+        quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
             #(#methods_vec)*
@@ -794,7 +811,8 @@ pub fn report2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output3 = if cfg!(feature = "terminal") { quote!{
+    let output3 = if cfg!(feature = "terminal") {
+        quote! {
         #[derive(Clone)]
         pub struct #proxy_ident(servant::Oid, servant::Terminal);
 
@@ -976,7 +994,8 @@ pub fn query2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let servant_ident = Ident::new(&format!("{}Servant", ident), ident.span());
     let proxy_ident = Ident::new(&format!("{}Proxy", ident), ident.span());
 
-    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
             #(#idents_camel_vec { #(#inputs_vec)* },)*
@@ -984,7 +1003,8 @@ pub fn query2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output2 = if cfg!(feature = "adapter") { quote! {
+    let output2 = if cfg!(feature = "adapter") {
+        quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
             #(#methods)*
@@ -1022,7 +1042,8 @@ pub fn query2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output3 = if cfg!(feature = "terminal") { quote!{
+    let output3 = if cfg!(feature = "terminal") {
+        quote! {
         #[derive(Clone)]
         pub struct #proxy_ident(servant::Terminal);
 
@@ -1168,7 +1189,8 @@ pub fn notify2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     let receiver_ident = Ident::new(&format!("{}Receiver", ident), ident.span());
     let notifier_ident = Ident::new(&format!("{}Notifier", ident), ident.span());
 
-    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) { quote! {
+    let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        quote! {
         #[derive(serde::Serialize, serde::Deserialize)]
         enum #request_ident {
             #(#idents_camel_vec { #(#inputs_vec)* },)*
@@ -1176,7 +1198,8 @@ pub fn notify2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output2 = if cfg!(feature = "terminal") { quote! {
+    let output2 = if cfg!(feature = "terminal") {
+        quote! {
         #( #attrs )*
         #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
             #(#methods_vec)*
@@ -1206,7 +1229,8 @@ pub fn notify2_interface(_attr: TokenStream, input: TokenStream) -> TokenStream 
     } else {
         proc_macro2::TokenStream::new()
     };
-    let output3 = if cfg!(feature = "adapter") { quote!{
+    let output3 = if cfg!(feature = "adapter") {
+        quote! {
         pub struct #notifier_ident(&'static servant::AdapterRegister);
 
         impl #notifier_ident {
