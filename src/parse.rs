@@ -339,7 +339,12 @@ impl Parse for NotifyInterfaceAttributes {
 }
 
 // --
-#[cfg(any(feature = "invoke", feature = "query", feature = "report", feature = "notify"))]
+#[cfg(any(
+    feature = "invoke",
+    feature = "query",
+    feature = "report",
+    feature = "notify"
+))]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct TraitContext {
     item_trait: ItemTrait,
@@ -354,7 +359,12 @@ pub(crate) struct TraitContext {
     request_ident: Ident,
 }
 
-#[cfg(any(feature = "invoke", feature = "query", feature = "report", feature = "notify"))]
+#[cfg(any(
+    feature = "invoke",
+    feature = "query",
+    feature = "report",
+    feature = "notify"
+))]
 impl Parse for TraitContext {
     fn parse(input: ParseStream) -> Result<Self> {
         let item_trait: ItemTrait = input.parse()?;
@@ -498,7 +508,10 @@ impl Parse for TraitContext {
 
 impl TraitContext {
     #[cfg(feature = "invoke")]
-    pub(crate) fn render_invoke_interface(&self, attributes: &InvokeInterfaceAttributes) -> TokenStream {
+    pub(crate) fn render_invoke_interface(
+        &self,
+        attributes: &InvokeInterfaceAttributes,
+    ) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -512,6 +525,10 @@ impl TraitContext {
             request_ident,
             ..
         } = self;
+        let fn_ident_callback_vec: Vec<_> = fn_ident_vec
+            .iter()
+            .map(|x| format_ident!("{}_with_callback", x))
+            .collect();
         let ItemTrait {
             attrs,
             vis,
@@ -621,6 +638,29 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
+        let output_callback = match attributes.callback {
+            Some(cb) if cb => quote! {
+                #(
+                    pub async fn #fn_ident_callback_vec<F>(
+                        &mut self,
+                        #(#inputs_vec)*
+                        f_f_f_f_f_20101008_f: F
+                    ) -> servant::ServantResult<()>
+                    where F: 'static + Fn(servant::ServantResult<#output_vec>) + Send,
+                    {
+                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                        self.2
+                            .invoke_with_callback(Some(self.0.clone()), Some(self.1.clone()),
+                                bincode::serialize(&request).unwrap(), move |oid, v| {
+                                    f_f_f_f_f_20101008_f(v.map(|x| bincode::deserialize(&x).unwrap()));
+                                })
+                            .await
+                    }
+                )*
+
+            },
+            _ => proc_macro2::TokenStream::new()
+        };
         let output3 = if cfg!(feature = "terminal") {
             quote! {
                 #[derive(Clone)]
@@ -628,7 +668,7 @@ impl TraitContext {
 
                 impl #proxy_ident {
                     pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
-                        let oid = servant::Oid::new(name, stringify!(#trait_ident));
+                        let oid = servant::Oid::new(name, Self::category());
                         Self(ctx, oid, t.clone())
                     }
                     pub fn category() -> &'static str {
@@ -636,45 +676,39 @@ impl TraitContext {
                     }
 
                     #(
-                    pub async fn #fn_ident_vec(
-                        &mut self,
-                        #(#inputs_vec)*
-                    ) -> servant::ServantResult<#output_vec> {
-                        let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
-                        let response = self
-                            .2
-                            .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
-                            .await;
-                        response.map(|x| bincode::deserialize(&x).unwrap())
-                    }
+                        pub async fn #fn_ident_vec(
+                            &mut self,
+                            #(#inputs_vec)*
+                        ) -> servant::ServantResult<#output_vec> {
+                            let request = #request_ident_vec::#fn_ident_camel_vec { #(#args_vec)* };
+                            let response = self
+                                .2
+                                .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+                                .await;
+                            response.map(|x| bincode::deserialize(&x).unwrap())
+                        }
                     )*
+
+                    #output_callback
                 }
             }
         } else {
             proc_macro2::TokenStream::new()
-        };
-        let output5 = match attributes.callback {
-            Some(cb) if cb => {
-                quote! {
-                    fn cb_true() {}
-                }
-            }
-            _ => quote! {
-                fn cb_false() {}
-            },
         };
 
         let output = quote! {
             #output1
             #output2
             #output3
-            #output5
         };
         output.into()
     }
 
     #[cfg(feature = "query")]
-    pub(crate) fn render_query_interface(&self, attributes: &QueryInterfaceAttributes) -> TokenStream {
+    pub(crate) fn render_query_interface(
+        &self,
+        attributes: &QueryInterfaceAttributes,
+    ) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -804,7 +838,10 @@ impl TraitContext {
     }
 
     #[cfg(feature = "report")]
-    pub(crate) fn render_report_interface(&self, attributes: &ReportInterfaceAttributes) -> TokenStream {
+    pub(crate) fn render_report_interface(
+        &self,
+        attributes: &ReportInterfaceAttributes,
+    ) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
@@ -937,7 +974,10 @@ impl TraitContext {
     }
 
     #[cfg(feature = "notify")]
-    pub(crate) fn render_notify_interface(&self, attributes: &NotifyInterfaceAttributes) -> TokenStream {
+    pub(crate) fn render_notify_interface(
+        &self,
+        attributes: &NotifyInterfaceAttributes,
+    ) -> TokenStream {
         let TraitContext {
             item_trait,
             fn_ident_vec,
