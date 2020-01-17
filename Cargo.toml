@@ -16,14 +16,14 @@ proc-macro = true
 
 [features]
 invoke = []
-query = []
+watch = []
 notify = []
 report = []
 adapter = []
 terminal = []
 
-# default = ["invoke", "query", "adapter", "terminal"]
-# full = ["invoke", "query", "report", "notify", "adapter", "terminal"]
+# default = ["invoke", "watch", "adapter", "terminal"]
+# full = ["invoke", "watch", "report", "notify", "adapter", "terminal"]
 
 [dependencies]
 syn = { version = "^1.0.13", features = ["default"] }

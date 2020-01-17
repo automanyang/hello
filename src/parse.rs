@@ -124,14 +124,14 @@ impl Parse for InvokeInterfaceAttributes {
 
 // --
 
-#[cfg(feature = "query")]
+#[cfg(feature = "watch")]
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct QueryInterfaceAttributes {
+pub(crate) struct WatchInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
-#[cfg(feature = "query")]
-impl Parse for QueryInterfaceAttributes {
+#[cfg(feature = "watch")]
+impl Parse for WatchInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
             proxy: None,
@@ -149,13 +149,13 @@ impl Parse for QueryInterfaceAttributes {
                             } else {
                                 return Err(Error::new(
                                     ident.span(),
-                                    "expected a &'static str value, such as \"QueryProxy\"",
+                                    "expected a &'static str value, such as \"WatchProxy\"",
                                 ));
                             }
                         } else {
                             return Err(Error::new(
                                 ident.span(),
-                                "expected a value, such as 'proxy: \"QueryProxy\"'",
+                                "expected a value, such as 'proxy: \"WatchProxy\"'",
                             ));
                         }
                     }
@@ -166,13 +166,13 @@ impl Parse for QueryInterfaceAttributes {
                             } else {
                                 return Err(Error::new(
                                     ident.span(),
-                                    "expected a &'static str value, such as \"QueryServant\"",
+                                    "expected a &'static str value, such as \"WatchServant\"",
                                 ));
                             }
                         } else {
                             return Err(Error::new(
                                 ident.span(),
-                                "expected a value, such as 'servant: \"QueryServant\"'",
+                                "expected a value, such as 'servant: \"WatchServant\"'",
                             ));
                         }
                     }
@@ -341,7 +341,7 @@ impl Parse for NotifyInterfaceAttributes {
 // --
 #[cfg(any(
     feature = "invoke",
-    feature = "query",
+    feature = "watch",
     feature = "report",
     feature = "notify"
 ))]
@@ -361,7 +361,7 @@ pub(crate) struct TraitContext {
 
 #[cfg(any(
     feature = "invoke",
-    feature = "query",
+    feature = "watch",
     feature = "report",
     feature = "notify"
 ))]
@@ -704,10 +704,10 @@ impl TraitContext {
         output.into()
     }
 
-    #[cfg(feature = "query")]
-    pub(crate) fn render_query_interface(
+    #[cfg(feature = "watch")]
+    pub(crate) fn render_watch_interface(
         &self,
-        attributes: &QueryInterfaceAttributes,
+        attributes: &WatchInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
             item_trait,
@@ -776,7 +776,7 @@ impl TraitContext {
                         stringify!(#trait_ident)
                     }
                 }
-                impl<S> servant::QueryServant for #servant_ident<S>
+                impl<S> servant::WatchServant for #servant_ident<S>
                 where
                     S: #trait_ident + 'static,
                 {
@@ -1063,18 +1063,11 @@ impl TraitContext {
 
         let output3 = if cfg!(feature = "adapter") {
             quote! {
-                pub struct #notifier_ident(&'static servant::AdapterRegister);
-
+                #[derive(Clone)]
+                pub struct #notifier_ident(servant::AdapterRegister);
                 impl #notifier_ident {
-                    pub fn instance() -> &'static #notifier_ident {
-                        static mut NOTIFIER: Option<#notifier_ident> = None;
-                        static INIT: std::sync::Once = std::sync::Once::new();
-                        unsafe {
-                            INIT.call_once(|| {
-                                NOTIFIER = Some(#notifier_ident(servant::AdapterRegister::instance()));
-                            });
-                            NOTIFIER.as_ref().unwrap()
-                        }
+                    pub fn new(ar: servant::AdapterRegister) -> Self {
+                        Self(ar)
                     }
                     #(
                     pub async fn #fn_ident_vec(

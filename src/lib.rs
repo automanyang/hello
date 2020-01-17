@@ -17,7 +17,7 @@
 //!
 //! 定义invoke接口，并根据adapter/terminal属性，生成服务端和客户端代码。
 //!
-//! ### query
+//! ### watch
 //!
 //! 定义query接口，并根据adapter/terminal属性，生成服务端和客户端代码。
 //!
@@ -99,19 +99,19 @@ pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// # Example
 /// ```
-/// #[servant_macro::query_interface]
+/// #[servant_macro::watch_interface]
 /// pub trait Export {
 ///     fn export_servants(&self) -> Vec<Oid>;
 ///     fn export_report_servants(&self) -> Vec<Oid>;
 ///     fn shutdown(&self, passcode: usize);
 /// }
 /// ```
-#[cfg(feature = "query")]
+#[cfg(feature = "watch")]
 #[proc_macro_attribute]
-pub fn query_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let attributes = parse_macro_input!(attr as parse::QueryInterfaceAttributes);
+pub fn watch_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attributes = parse_macro_input!(attr as parse::WatchInterfaceAttributes);
     let trait_context = parse_macro_input!(input as parse::TraitContext);
-    trait_context.render_query_interface(&attributes)
+    trait_context.render_watch_interface(&attributes)
 }
 
 /// 定义不带返回值方法的接口，接口中可以有多个不带返回值的方法。
