@@ -32,7 +32,7 @@ pub trait Report {
 
 // 定义notify类型的接口，每个Server只能有一个notify类型的接口
 #[servant::notify_interface(proxy: "Notifier", servant: "Receiver")]
-pub trait Notice {
+pub trait Datetime {
     fn date(&self, y: u16, m: u8, d: u8);
     fn time(&self, h: u8, m: u8, s: u8);
 }
@@ -45,11 +45,13 @@ pub trait Notice {
 有四种attributes可以使用：
 
 1. proxy：类型是&str，定义客户端使用的proxy的名称。缺省生成的名称是在trait name后直接增加Proxy，就像如下代码一样：
+
 ```rust
 let proxy_name = format!("{}Proxy", trait_name);
 ```
 
 2. servant：类型是&str，定义服务端使用的servant的名称。缺省生成的名称是在trait name后直接增加Servant，就像如下代码一样：
+
 ```rust
 let servant_name = format!("{}Servant", trait_name);
 ```
@@ -61,8 +63,171 @@ let servant_name = format!("{}Servant", trait_name);
 ### Cargo.toml文件中可以使用的Features说明
 
 * adapter: 引入服务端的代码。
+
 * terminal: 引入客户端的代码
+
 * invoke: 定义invoke接口，并根据adapter/terminal属性，生成服务端和客户端代码。
-* watch: 定义query接口，并根据adapter/terminal属性，生成服务端和客户端代码。
+
+* watch: 定义watch接口，并根据adapter/terminal属性，生成服务端和客户端代码。
+
 * report: 定义report接口，并根据adapter/terminal属性，生成服务端和客户端代码。
+
 * notify: 定义notify接口，并根据adapter/terminal属性，生成服务端和客户端代码。
+
+## 深入细节
+
+在此，我们讨论下自动生成的代码，帮助理解其中的机制。
+
+### invoke_interface生成的代码
+
+对于如下的定义：
+
+```rust
+#[servant::invoke_interface]
+pub trait Hello {
+    fn hello(&self, n: i32) -> String;
+    fn bye(&self);
+}
+```
+
+自动生成的代码有三部分：
+
+1. 在客户端和服务端共用的代码：
+
+```rust
+#[derive(serde::Serialize, serde::Deserialize)]
+enum HelloRequest {
+    Hello { n: i32 },
+    Bye { },
+}
+```
+
+2. 在服务端使用的代码：
+
+```rust
+pub trait Hello {
+    fn hello(&self, ctx: Option<servant::Context>, n: i32) -> String;
+    fn bye(&self, ctx: Option<servant::Context>);
+}
+
+pub struct HelloServant<S> {
+    name: String,
+    entity: S,
+}
+impl<S> HelloServant<S> {
+    pub fn new(name: &str, entity: S) -> Self {
+        Self { name: name.to_string(), entity }
+    }
+    pub fn category() -> &'static str {
+        "Hello"
+    }
+}
+
+// if persistency == true {
+// 生成如下代码：
+impl<S> servant::Servant for HelloServant<S>
+where
+    S: serde::Serialize + Hello + 'static,
+{
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn dump(&self) -> servant::ServantResult<Vec<u8>> {
+        bincode::serialize(&self.entity).map_err(|e| e.to_string().into())
+    }
+    fn serve(&mut self, ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
+        let req: HelloRequest = bincode::deserialize(&req).unwrap();
+        let reps = match req {
+            HelloRequest::Hello { n } =>
+                bincode::serialize(&self.entity.hello(ctx, n)),
+            HelloRequest::Bye { } =>
+                bincode::serialize(&self.entity.bye(ctx)),
+        }
+        .unwrap();
+        reps
+    }
+}
+// } else {
+// persistency是false，生成如下代码：
+impl<S> servant::Servant for HelloServant<S>
+where
+    S: Hello + 'static,
+{
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn serve(&mut self, ctx: Option<servant::Context>, req: Vec<u8>) -> Vec<u8> {
+        let req: HelloRequest = bincode::deserialize(&req).unwrap();
+        let reps = match req {
+            HelloRequest::Hello { n } =>
+                bincode::serialize(&self.entity.hello(ctx, n)),
+            HelloRequest::Bye { } =>
+                bincode::serialize(&self.entity.bye(ctx)),
+        }
+        .unwrap();
+        reps
+    }
+}
+// }
+```
+
+3. 在客户端使用的代码：
+
+```rust
+#[derive(Clone)]
+pub struct HelloProxy(servant::Context, servant::Oid, servant::Terminal);
+
+impl HelloProxy {
+    pub fn new(ctx: servant::Context, name: &str, t: &servant::Terminal) -> Self {
+        let oid = servant::Oid::new(name, Self::category());
+        Self(ctx, oid, t.clone())
+    }
+    pub fn category() -> &'static str {
+        "Hello"
+    }
+    pub fn hello(&self, n: i32) -> String {
+        let request = HelloRequest::Hello { n };
+        let response = self
+            .2
+            .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+            .await;
+        response.map(|x| bincode::deserialize(&x).unwrap())
+    }
+    fn bye(&self) {
+        let request = HelloRequest::Bye { };
+        let response = self
+            .2
+            .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
+            .await;
+        response.map(|x| bincode::deserialize(&x).unwrap())
+    }
+
+    // if callback == true {
+    // 生成如下代码：
+    pub fn hello_with_callback(&self, n: i32, __f_20101008__: F) -> servant::ServantResult<()>
+        where F: 'static + Fn(servant::ServantResult<String>) + Send,
+    {
+        let request = HelloRequest::Hello { n };
+        self.2
+            .invoke_with_callback(Some(self.0.clone()), Some(self.1.clone()),
+                bincode::serialize(&request).unwrap(), move |oid, v| {
+                    __f_20101008__(v.map(|x| bincode::deserialize(&x).unwrap()));
+                })
+            .await
+    }
+    fn bye_with_callback(&self, __f_20101008__: F) -> servant::ServantResult<()>
+        where F: 'static + Fn(servant::ServantResult<()>) + Send,
+    {
+        let request = HelloRequest::Bye { };
+        self.2
+            .invoke_with_callback(Some(self.0.clone()), Some(self.1.clone()),
+                bincode::serialize(&request).unwrap(), move |oid, v| {
+                    __f_20101008__(v.map(|x| bincode::deserialize(&x).unwrap()));
+                })
+            .await
+    }
+    // }
+}
+```
+
+如上的代码是比较清楚的，请注意其中persistency、callback attributes不同，会生成不同的代码。
