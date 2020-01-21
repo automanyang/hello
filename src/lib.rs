@@ -4,7 +4,7 @@
 //!
 //! ### 四种类型的接口
 //!
-//! 分别通过invoke_interface、watch_interface、report_interface和notify_interface定义。
+//! 分别通过[`invoke_interface`]、[`watch_interface`]、[`report_interface`]和[`notify_interface`]定义。
 //!
 //! ```rust
 //! // 定义invoke类型的接口，每个Server可以有多个invoke类型的接口
@@ -72,6 +72,11 @@
 //! * report: 定义report接口，并根据adapter/terminal属性，生成服务端和客户端代码。
 //!
 //! * notify: 定义notify接口，并根据adapter/terminal属性，生成服务端和客户端代码。
+//!
+//! [`invoke_interface`]: attr.invoke_interface.html
+//! [watch_interface]: attr.watch_interface.html
+//! [`report_interface`]: attr.report_interface.html
+//! [`notify_interface`]: attr.notify_interface.html
 
 // --
 
