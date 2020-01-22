@@ -14,7 +14,6 @@ use syn::{
 
 // --
 
-#[cfg(feature = "invoke")]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct InvokeInterfaceAttributes {
     proxy: Option<String>,
@@ -22,7 +21,6 @@ pub(crate) struct InvokeInterfaceAttributes {
     persistency: Option<bool>,
     callback: Option<bool>,
 }
-#[cfg(feature = "invoke")]
 impl Parse for InvokeInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -124,13 +122,11 @@ impl Parse for InvokeInterfaceAttributes {
 
 // --
 
-#[cfg(feature = "watch")]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct WatchInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
-#[cfg(feature = "watch")]
 impl Parse for WatchInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -196,13 +192,11 @@ impl Parse for WatchInterfaceAttributes {
 
 // --
 
-#[cfg(feature = "report")]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct ReportInterfaceAttributes {
     proxy: Option<String>,
     servant: Option<String>,
 }
-#[cfg(feature = "report")]
 impl Parse for ReportInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -268,13 +262,11 @@ impl Parse for ReportInterfaceAttributes {
 
 // --
 
-#[cfg(feature = "notify")]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct NotifyInterfaceAttributes {
     receiver: Option<String>,
     notifier: Option<String>,
 }
-#[cfg(feature = "notify")]
 impl Parse for NotifyInterfaceAttributes {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut r = Self {
@@ -339,12 +331,8 @@ impl Parse for NotifyInterfaceAttributes {
 }
 
 // --
-#[cfg(any(
-    feature = "invoke",
-    feature = "watch",
-    feature = "report",
-    feature = "notify"
-))]
+
+// #[allow(unused)]
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct TraitContext {
     item_trait: ItemTrait,
@@ -359,12 +347,6 @@ pub(crate) struct TraitContext {
     request_ident: Ident,
 }
 
-#[cfg(any(
-    feature = "invoke",
-    feature = "watch",
-    feature = "report",
-    feature = "notify"
-))]
 impl Parse for TraitContext {
     fn parse(input: ParseStream) -> Result<Self> {
         let item_trait: ItemTrait = input.parse()?;
@@ -507,7 +489,6 @@ impl Parse for TraitContext {
 }
 
 impl TraitContext {
-    #[cfg(feature = "invoke")]
     pub(crate) fn render_invoke_interface(
         &self,
         attributes: &InvokeInterfaceAttributes,
@@ -555,7 +536,7 @@ impl TraitContext {
             format_ident!("{}Proxy", trait_ident)
         };
 
-        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        let output1 = if cfg!(any(feature = "server", feature = "client")) {
             quote! {
                 #[derive(serde::Serialize, serde::Deserialize)]
                 enum #request_ident {
@@ -613,7 +594,7 @@ impl TraitContext {
                 }
             },
         };
-        let output2 = if cfg!(feature = "adapter") {
+        let output2 = if cfg!(feature = "server") {
             quote! {
                 #( #attrs )*
                 #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
@@ -661,7 +642,7 @@ impl TraitContext {
             },
             _ => proc_macro2::TokenStream::new()
         };
-        let output3 = if cfg!(feature = "terminal") {
+        let output3 = if cfg!(feature = "client") {
             quote! {
                 #[derive(Clone)]
                 pub struct #proxy_ident(servant::Context, servant::Oid, servant::Terminal);
@@ -704,7 +685,6 @@ impl TraitContext {
         output.into()
     }
 
-    #[cfg(feature = "watch")]
     pub(crate) fn render_watch_interface(
         &self,
         attributes: &WatchInterfaceAttributes,
@@ -748,7 +728,7 @@ impl TraitContext {
             format_ident!("{}Proxy", trait_ident)
         };
 
-        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        let output1 = if cfg!(any(feature = "server", feature = "client")) {
             quote! {
                 #[derive(serde::Serialize, serde::Deserialize)]
                 enum #request_ident {
@@ -759,7 +739,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output2 = if cfg!(feature = "adapter") {
+        let output2 = if cfg!(feature = "server") {
             quote! {
                 #( #attrs )*
                 #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
@@ -797,7 +777,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output3 = if cfg!(feature = "terminal") {
+        let output3 = if cfg!(feature = "client") {
             quote! {
                 #[derive(Clone)]
                 pub struct #proxy_ident(servant::Terminal);
@@ -837,7 +817,6 @@ impl TraitContext {
         output.into()
     }
 
-    #[cfg(feature = "report")]
     pub(crate) fn render_report_interface(
         &self,
         attributes: &ReportInterfaceAttributes,
@@ -881,7 +860,7 @@ impl TraitContext {
             format_ident!("{}ReportProxy", trait_ident)
         };
 
-        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        let output1 = if cfg!(any(feature = "server", feature = "client")) {
             quote! {
                 #[derive(serde::Serialize, serde::Deserialize)]
                 enum #request_ident {
@@ -892,7 +871,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output2 = if cfg!(feature = "adapter") {
+        let output2 = if cfg!(feature = "server") {
             quote! {
                 #( #attrs )*
                 #vis #unsafety #auto_token #trait_token #trait_ident #generics #colon_token #supertraits {
@@ -932,7 +911,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output3 = if cfg!(feature = "terminal") {
+        let output3 = if cfg!(feature = "client") {
             quote! {
                 #[derive(Clone)]
                 pub struct #proxy_ident(servant::Oid, servant::Terminal);
@@ -973,7 +952,6 @@ impl TraitContext {
         output.into()
     }
 
-    #[cfg(feature = "notify")]
     pub(crate) fn render_notify_interface(
         &self,
         attributes: &NotifyInterfaceAttributes,
@@ -1017,7 +995,7 @@ impl TraitContext {
             format_ident!("{}Notifier", trait_ident)
         };
 
-        let output1 = if cfg!(any(feature = "adapter", feature = "terminal")) {
+        let output1 = if cfg!(any(feature = "server", feature = "client")) {
             quote! {
                 #[derive(serde::Serialize, serde::Deserialize)]
                 enum #request_ident {
@@ -1028,7 +1006,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output2 = if cfg!(feature = "terminal") {
+        let output2 = if cfg!(feature = "client") {
             quote! {
                 #( #attrs )*
                 #vis #unsafety #auto_token #trait_token #ident #generics #colon_token #supertraits {
@@ -1061,7 +1039,7 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output3 = if cfg!(feature = "adapter") {
+        let output3 = if cfg!(feature = "server") {
             quote! {
                 #[derive(Clone)]
                 pub struct #notifier_ident(servant::AdapterRegister);

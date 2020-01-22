@@ -61,20 +61,12 @@
 //!
 //! ### Cargo.toml文件中可以使用的Features说明
 //!
-//! * terminal: 引入客户端的代码。
+//! * client: 引入客户端的代码。
 //!
 //! * adapter: 引入服务端的代码。
 //!
-//! * invoke: 定义invoke接口，并根据adapter/terminal属性，生成服务端和客户端代码。
-//!
-//! * watch: 定义watch接口，并根据adapter/terminal属性，生成服务端和客户端代码。
-//!
-//! * report: 定义report接口，并根据adapter/terminal属性，生成服务端和客户端代码。
-//!
-//! * notify: 定义notify接口，并根据adapter/terminal属性，生成服务端和客户端代码。
-//!
 //! [`invoke_interface`]: attr.invoke_interface.html
-//! [watch_interface]: attr.watch_interface.html
+//! [`watch_interface`]: attr.watch_interface.html
 //! [`report_interface`]: attr.report_interface.html
 //! [`notify_interface`]: attr.notify_interface.html
 
@@ -120,7 +112,6 @@ mod utilities;
 ///     fn hello(&self, n: i32) -> String;
 /// }
 /// ```
-#[cfg(feature = "invoke")]
 #[proc_macro_attribute]
 pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attributes = parse_macro_input!(attr as parse::InvokeInterfaceAttributes);
@@ -155,7 +146,6 @@ pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///     fn version(&self) -> String;
 /// }
 /// ```
-#[cfg(feature = "watch")]
 #[proc_macro_attribute]
 pub fn watch_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attributes = parse_macro_input!(attr as parse::WatchInterfaceAttributes);
@@ -189,7 +179,6 @@ pub fn watch_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///     fn post(&self, email: Vec<String>);
 /// }
 /// ```
-#[cfg(feature = "report")]
 #[proc_macro_attribute]
 pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attributes = parse_macro_input!(attr as parse::ReportInterfaceAttributes);
@@ -221,7 +210,6 @@ pub fn report_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 ///     fn time(&self, h: u8, m: u8, s: u8);
 /// }
 /// ```
-#[cfg(feature = "notify")]
 #[proc_macro_attribute]
 pub fn notify_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
     let attributes = parse_macro_input!(attr as parse::NotifyInterfaceAttributes);
