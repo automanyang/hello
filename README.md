@@ -185,7 +185,7 @@ impl HelloProxy {
     pub fn category() -> &'static str {
         "Hello"
     }
-    pub fn hello(&self, n: i32) -> String {
+    pub fn hello(&mut self, n: i32) -> ServantResult<String> {
         let request = HelloRequest::Hello { n };
         let response = self
             .2
@@ -193,7 +193,7 @@ impl HelloProxy {
             .await;
         response.map(|x| bincode::deserialize(&x).unwrap())
     }
-    fn bye(&self) {
+    fn bye(&mut self) -> ServantResult<()> {
         let request = HelloRequest::Bye { };
         let response = self
             .2
