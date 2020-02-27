@@ -8,13 +8,13 @@
 //!
 //! ```rust
 //! // 定义invoke类型的接口，每个Server可以有多个invoke类型的接口
-//! #[servant::invoke_interface(proxy: "HelloProxy", servant: "HelloServant", persistency: true, callback: false)]
+//! #[servant::invoke_interface(proxy = "HelloProxy", servant = "HelloServant", persistency = true, callback = false)]
 //! pub trait Hello {
 //!     fn hello(&self, n: i32) -> String;
 //! }
 //!
 //! // 定义watch类型的接口，每个Server只能有一个watch类型的接口
-//! #[servant::watch_interface(proxy: "DogProxy", servant: "DogServant")]
+//! #[servant::watch_interface(proxy = "DogProxy", servant = "DogServant")]
 //! fn export_servants(&self) -> Vec<Oid>;
 //! pub trait WatchDog {
 //!     fn login(&self, name: String, password: String) -> UserCookie;
@@ -23,7 +23,7 @@
 //! }
 //!
 //! // 定义report类型的接口，每个Server可以有多个report类型的接口
-//! #[servant::report_interface(proxy: "Reporter", servant: "Editor")]
+//! #[servant::report_interface(proxy = "Reporter", servant = "Editor")]
 //! fn report(&self, msg: String);
 //! pub trait Report {
 //!     fn post(&self, email: Vec<String>);
@@ -31,7 +31,7 @@
 //!
 //! // 定义notify类型的接口，每个Server只能有一个notify类型的接口
 //! pub trait Notice {
-//! #[servant::notify_interface(proxy: "Notifier", servant: "Receiver")]
+//! #[servant::notify_interface(notifier = "Notifier", receiver = "Receiver")]
 //!     fn time(&self, h: u8, m: u8, s: u8);
 //!     fn date(&self, y: u16, m: u8, d: u8);
 //! }
@@ -139,11 +139,12 @@ pub fn invoke_interface(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 /// // 定义watch类型的接口，每个Server只能有一个watch类型的接口
 /// #[servant::watch_interface]
-/// pub trait WatchDog {
-///     fn export_servants(&self) -> Vec<Oid>;
-///     fn export_report_servants(&self) -> Vec<Oid>;
-///     fn login(&self, name: String, password: String) -> UserCookie;
+/// pub trait Help {
+///     fn about(&self) -> String;
+///     fn readme(&self) -> String;
 ///     fn version(&self) -> String;
+///     fn list(&self) -> Vec<String>;
+///     fn help(&self, key: String) -> Option<String>;
 /// }
 /// ```
 #[proc_macro_attribute]

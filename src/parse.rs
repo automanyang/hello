@@ -8,9 +8,18 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    Error, Expr, FieldValue, FnArg, Ident, ItemTrait, Lit, Member, ReturnType, Signature,
-    TraitItem, TraitItemMethod,
+    Error, FnArg, Ident, ItemTrait, Lit, MetaNameValue, ReturnType,
+    Signature, TraitItem, TraitItemMethod,
 };
+
+// --
+
+const PROSY_STR: &str = "proxy";
+const SERVANT_STR: &str = "servant";
+const PERSISTENCY_STR: &str = "persistency";
+const CALLBACK_STR: &str = "callback";
+const RECEIVER_STR: &str = "receiver";
+const NOTIFIER_STR: &str = "notifier";
 
 // --
 
@@ -30,90 +39,50 @@ impl Parse for InvokeInterfaceAttributes {
             callback: None,
         };
 
-        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
-        for x in fields.iter() {
-            if let Member::Named(ref ident) = x.member {
-                match ident.to_string().as_str() {
-                    "proxy" => {
-                        if let Expr::Lit(ref proxy) = x.expr {
-                            if let Lit::Str(ref proxy) = proxy.lit {
-                                r.proxy.replace(proxy.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"HelloProxy\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'proxy: \"HelloProxy\"'",
-                            ));
-                        }
-                    }
-                    "servant" => {
-                        if let Expr::Lit(ref servant) = x.expr {
-                            if let Lit::Str(ref servant) = servant.lit {
-                                r.servant.replace(servant.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"HelloServant\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'servant: \"HelloServant\"'",
-                            ));
-                        }
-                    }
-                    "persistency" => {
-                        if let Expr::Lit(ref persistency) = x.expr {
-                            if let Lit::Bool(ref persistency) = persistency.lit {
-                                r.persistency.replace(persistency.value);
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a Bool value, such as 'true'",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'persistency: true'",
-                            ));
-                        }
-                    }
-                    "callback" => {
-                        if let Expr::Lit(ref callback) = x.expr {
-                            if let Lit::Bool(ref callback) = callback.lit {
-                                r.callback.replace(callback.value);
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a Bool value, such as 'true'",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'callback: true'",
-                            ));
-                        }
-                    }
-                    _ => {
+        let args = Punctuated::<MetaNameValue, Comma>::parse_terminated(input)?;
+        for MetaNameValue {
+            path,
+            // eq_token,
+            lit,
+            ..
+        } in args.iter()
+        {
+            match lit {
+                Lit::Str(lit_str) => {
+                    let v = lit_str.value();
+                    if path.is_ident(PROSY_STR) {
+                        r.proxy.replace(v);
+                    } else if path.is_ident(SERVANT_STR) {
+                        r.servant.replace(v);
+                    } else {
                         return Err(Error::new(
-                            ident.span(),
-                            "expected `proxy, servant, persistency or callback` only.",
-                        ))
+                            lit_str.span(),
+                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
+                        ));
                     }
                 }
-            } else {
-                return Err(Error::new(
-                    x.span(),
-                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
-                ));
+                Lit::Bool(lit_bool) => {
+                    let v = lit_bool.value;
+                    if path.is_ident(PERSISTENCY_STR) {
+                        r.persistency.replace(v);
+                    } else if path.is_ident(CALLBACK_STR) {
+                        r.callback.replace(v);
+                    } else {
+                        return Err(Error::new(
+                            lit_bool.span(),
+                            format!(
+                                "name expected '{}' or '{}' only.",
+                                PERSISTENCY_STR, CALLBACK_STR
+                            ),
+                        ));
+                    }
+                }
+                _ => {
+                    return Err(Error::new(
+                        lit.span(),
+                        "value expected '&str' or 'bool' only.",
+                    ));
+                }
             }
         }
         Ok(r)
@@ -134,56 +103,31 @@ impl Parse for WatchInterfaceAttributes {
             servant: None,
         };
 
-        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
-        for x in fields.iter() {
-            if let Member::Named(ref ident) = x.member {
-                match ident.to_string().as_str() {
-                    "proxy" => {
-                        if let Expr::Lit(ref proxy) = x.expr {
-                            if let Lit::Str(ref proxy) = proxy.lit {
-                                r.proxy.replace(proxy.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"WatchProxy\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'proxy: \"WatchProxy\"'",
-                            ));
-                        }
-                    }
-                    "servant" => {
-                        if let Expr::Lit(ref servant) = x.expr {
-                            if let Lit::Str(ref servant) = servant.lit {
-                                r.servant.replace(servant.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"WatchServant\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'servant: \"WatchServant\"'",
-                            ));
-                        }
-                    }
-                    _ => {
+        let args = Punctuated::<MetaNameValue, Comma>::parse_terminated(input)?;
+        for MetaNameValue {
+            path,
+            // eq_token,
+            lit,
+            ..
+        } in args.iter()
+        {
+            match lit {
+                Lit::Str(lit_str) => {
+                    let v = lit_str.value();
+                    if path.is_ident(PROSY_STR) {
+                        r.proxy.replace(v);
+                    } else if path.is_ident(SERVANT_STR) {
+                        r.servant.replace(v);
+                    } else {
                         return Err(Error::new(
-                            ident.span(),
-                            "expected `proxy' or 'servant` only.",
-                        ))
+                            lit_str.span(),
+                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
+                        ));
                     }
                 }
-            } else {
-                return Err(Error::new(
-                    x.span(),
-                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
-                ));
+                _ => {
+                    return Err(Error::new(lit.span(), "value expected '&str' only."));
+                }
             }
         }
         Ok(r)
@@ -204,56 +148,34 @@ impl Parse for ReportInterfaceAttributes {
             servant: None,
         };
 
-        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
-        for x in fields.iter() {
-            if let Member::Named(ref ident) = x.member {
-                match ident.to_string().as_str() {
-                    "proxy" => {
-                        if let Expr::Lit(ref proxy) = x.expr {
-                            if let Lit::Str(ref proxy) = proxy.lit {
-                                r.proxy.replace(proxy.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"ReportProxy\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'proxy: \"ReportProxy\"'",
-                            ));
-                        }
-                    }
-                    "servant" => {
-                        if let Expr::Lit(ref servant) = x.expr {
-                            if let Lit::Str(ref servant) = servant.lit {
-                                r.servant.replace(servant.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"ReportServant\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'servant: \"ReportServant\"'",
-                            ));
-                        }
-                    }
-                    _ => {
+        let args = Punctuated::<MetaNameValue, Comma>::parse_terminated(input)?;
+        for MetaNameValue {
+            path,
+            // eq_token,
+            lit,
+            ..
+        } in args.iter()
+        {
+            match lit {
+                Lit::Str(lit_str) => {
+                    let v = lit_str.value();
+                    if path.is_ident(PROSY_STR) {
+                        r.proxy.replace(v);
+                    } else if path.is_ident(SERVANT_STR) {
+                        r.servant.replace(v);
+                    } else {
                         return Err(Error::new(
-                            ident.span(),
-                            "expected `proxy' or 'servant` only.",
-                        ))
+                            lit_str.span(),
+                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
+                        ));
                     }
                 }
-            } else {
-                return Err(Error::new(
-                    x.span(),
-                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
-                ));
+                _ => {
+                    return Err(Error::new(
+                        lit.span(),
+                        "value expected '&str' only.",
+                    ));
+                }
             }
         }
         Ok(r)
@@ -261,6 +183,7 @@ impl Parse for ReportInterfaceAttributes {
 }
 
 // --
+
 
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct NotifyInterfaceAttributes {
@@ -274,56 +197,34 @@ impl Parse for NotifyInterfaceAttributes {
             notifier: None,
         };
 
-        let fields = Punctuated::<FieldValue, Comma>::parse_terminated(input)?;
-        for x in fields.iter() {
-            if let Member::Named(ref ident) = x.member {
-                match ident.to_string().as_str() {
-                    "receiver" => {
-                        if let Expr::Lit(ref l) = x.expr {
-                            if let Lit::Str(ref s) = l.lit {
-                                r.receiver.replace(s.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"HelloReceiver\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'receiver: \"HelloReceiver\"'",
-                            ));
-                        }
-                    }
-                    "notifier" => {
-                        if let Expr::Lit(ref l) = x.expr {
-                            if let Lit::Str(ref s) = l.lit {
-                                r.notifier.replace(s.value());
-                            } else {
-                                return Err(Error::new(
-                                    ident.span(),
-                                    "expected a &'static str value, such as \"HelloNotifier\"",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new(
-                                ident.span(),
-                                "expected a value, such as 'servant: \"HelloNotifier\"'",
-                            ));
-                        }
-                    }
-                    _ => {
+        let args = Punctuated::<MetaNameValue, Comma>::parse_terminated(input)?;
+        for MetaNameValue {
+            path,
+            // eq_token,
+            lit,
+            ..
+        } in args.iter()
+        {
+            match lit {
+                Lit::Str(lit_str) => {
+                    let v = lit_str.value();
+                    if path.is_ident(RECEIVER_STR) {
+                        r.receiver.replace(v);
+                    } else if path.is_ident(NOTIFIER_STR) {
+                        r.notifier.replace(v);
+                    } else {
                         return Err(Error::new(
-                            ident.span(),
-                            "expected `proxy' or 'servant` only.",
-                        ))
+                            lit_str.span(),
+                            format!("name expected '{}' or '{}' only.", RECEIVER_STR, NOTIFIER_STR),
+                        ));
                     }
                 }
-            } else {
-                return Err(Error::new(
-                    x.span(),
-                    "named filed accept only, can't accept unnamed field like '0, 1, 2'",
-                ));
+                _ => {
+                    return Err(Error::new(
+                        lit.span(),
+                        "value expected '&str' only.",
+                    ));
+                }
             }
         }
         Ok(r)
@@ -494,7 +395,20 @@ impl TraitContext {
         attributes: &InvokeInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait,
+            item_trait: ItemTrait {
+                attrs,
+                vis,
+                unsafety,
+                auto_token,
+                trait_token,
+                ident,
+                generics,
+                colon_token,
+                supertraits,
+                // brace_token,
+                // items,
+                ..
+            },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -506,24 +420,11 @@ impl TraitContext {
             request_ident,
             ..
         } = self;
+
         let fn_ident_callback_vec: Vec<_> = fn_ident_vec
             .iter()
             .map(|x| format_ident!("{}_with_callback", x))
             .collect();
-        let ItemTrait {
-            attrs,
-            vis,
-            unsafety,
-            auto_token,
-            trait_token,
-            ident,
-            generics,
-            colon_token,
-            supertraits,
-            // brace_token,
-            // items,
-            ..
-        } = item_trait;
         let trait_ident = ident;
         let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
@@ -547,8 +448,8 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output_persistence = match attributes.persistency {
-            Some(p) if p => quote! {
+        let output_persistence = if attributes.persistency.unwrap_or(false) {
+            quote! {
                 impl<S> servant::Servant for #servant_ident<S>
                 where
                     S: serde::Serialize + #trait_ident + 'static,
@@ -571,8 +472,9 @@ impl TraitContext {
                         reps
                     }
                 }
-            },
-            _ => quote! {
+            }
+        } else {
+            quote! {
                 impl<S> servant::Servant for #servant_ident<S>
                 where
                     S: #trait_ident + 'static,
@@ -592,7 +494,7 @@ impl TraitContext {
                         reps
                     }
                 }
-            },
+            }
         };
         let output2 = if cfg!(feature = "server") {
             quote! {
@@ -619,8 +521,8 @@ impl TraitContext {
             proc_macro2::TokenStream::new()
         };
 
-        let output_callback = match attributes.callback {
-            Some(cb) if cb => quote! {
+        let output_callback = if attributes.callback.unwrap_or(false) {
+            quote! {
                 #(
                     pub async fn #fn_ident_callback_vec<F>(
                         &mut self,
@@ -638,9 +540,9 @@ impl TraitContext {
                             .await
                     }
                 )*
-
-            },
-            _ => proc_macro2::TokenStream::new()
+            }
+        } else {
+            proc_macro2::TokenStream::new()
         };
         let output3 = if cfg!(feature = "client") {
             quote! {
@@ -655,6 +557,12 @@ impl TraitContext {
                     pub fn category() -> &'static str {
                         stringify!(#trait_ident)
                     }
+                    pub fn context_mut(&mut self) -> &mut servant::Context {
+                        &mut self.0
+                    }
+                    pub fn terminal(&self) -> servant::Terminal {
+                        self.2.clone()
+                    }
 
                     #(
                         pub async fn #fn_ident_vec(
@@ -666,7 +574,7 @@ impl TraitContext {
                                 .2
                                 .invoke(Some(self.0.clone()), Some(self.1.clone()), bincode::serialize(&request).unwrap())
                                 .await;
-                            response.map(|x| bincode::deserialize(&x).unwrap())
+                            response.map(|v| bincode::deserialize(&v).unwrap())
                         }
                     )*
 
@@ -690,7 +598,20 @@ impl TraitContext {
         attributes: &WatchInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait,
+            item_trait: ItemTrait {
+                attrs,
+                vis,
+                unsafety,
+                auto_token,
+                trait_token,
+                ident,
+                generics,
+                colon_token,
+                supertraits,
+                // brace_token,
+                // items,
+                ..
+            },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -702,20 +623,7 @@ impl TraitContext {
             request_ident,
             ..
         } = self;
-        let ItemTrait {
-            attrs,
-            vis,
-            unsafety,
-            auto_token,
-            trait_token,
-            ident,
-            generics,
-            colon_token,
-            supertraits,
-            // brace_token,
-            // items,
-            ..
-        } = item_trait;
+
         let trait_ident = ident;
         let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
@@ -822,7 +730,20 @@ impl TraitContext {
         attributes: &ReportInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait,
+            item_trait: ItemTrait {
+                attrs,
+                vis,
+                unsafety,
+                auto_token,
+                trait_token,
+                ident,
+                generics,
+                colon_token,
+                supertraits,
+                // brace_token,
+                // items,
+                ..
+            },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -834,20 +755,7 @@ impl TraitContext {
             request_ident,
             ..
         } = self;
-        let ItemTrait {
-            attrs,
-            vis,
-            unsafety,
-            auto_token,
-            trait_token,
-            ident,
-            generics,
-            colon_token,
-            supertraits,
-            // brace_token,
-            // items,
-            ..
-        } = item_trait;
+
         let trait_ident = ident;
         let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
@@ -957,7 +865,20 @@ impl TraitContext {
         attributes: &NotifyInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait,
+            item_trait: ItemTrait {
+                attrs,
+                vis,
+                unsafety,
+                auto_token,
+                trait_token,
+                ident,
+                generics,
+                colon_token,
+                supertraits,
+                // brace_token,
+                // items,
+                ..
+            },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -969,20 +890,7 @@ impl TraitContext {
             request_ident,
             ..
         } = self;
-        let ItemTrait {
-            attrs,
-            vis,
-            unsafety,
-            auto_token,
-            trait_token,
-            ident,
-            generics,
-            colon_token,
-            supertraits,
-            // brace_token,
-            // items,
-            ..
-        } = item_trait;
+
         let trait_ident = ident;
         let receiver_ident = if let Some(ref s) = attributes.receiver {
             Ident::new(&s, trait_ident.span())
