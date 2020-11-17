@@ -14,8 +14,13 @@
 //! }
 //!
 //! // 定义watch类型的接口，每个Server只能有一个watch类型的接口
+//! # type UserCookie = usize;
+//! # #[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+//! # pub struct Oid {
+//! #     name: String,
+//! #     category: String,
+//! # }
 //! #[servant::watch_interface(proxy = "DogProxy", servant = "DogServant")]
-//! fn export_servants(&self) -> Vec<Oid>;
 //! pub trait WatchDog {
 //!     fn login(&self, name: String, password: String) -> UserCookie;
 //!     fn export_report_servants(&self) -> Vec<Oid>;
@@ -24,14 +29,13 @@
 //!
 //! // 定义report类型的接口，每个Server可以有多个report类型的接口
 //! #[servant::report_interface(proxy = "Reporter", servant = "Editor")]
-//! fn report(&self, msg: String);
 //! pub trait Report {
 //!     fn post(&self, email: Vec<String>);
 //! }
 //!
 //! // 定义notify类型的接口，每个Server只能有一个notify类型的接口
-//! pub trait Notice {
 //! #[servant::notify_interface(notifier = "Notifier", receiver = "Receiver")]
+//! pub trait Notice {
 //!     fn time(&self, h: u8, m: u8, s: u8);
 //!     fn date(&self, y: u16, m: u8, d: u8);
 //! }
@@ -46,12 +50,14 @@
 //! 1. proxy：类型是&str，定义客户端使用的proxy的名称。缺省生成的名称是在trait name后直接增加Proxy，就像如下代码一样：
 //!
 //! ```rust
+//! # let trait_name = "Hello".to_string();
 //! let proxy_name = format!("{}Proxy", trait_name);
 //! ```
 //!
 //! 2. servant：类型是&str，定义服务端使用的servant的名称。缺省生成的名称是在trait name后直接增加Servant，就像如下代码一样：
 //!
 //! ```rust
+//! # let trait_name = "Hello".to_string();
 //! let servant_name = format!("{}Servant", trait_name);
 //! ```
 //!

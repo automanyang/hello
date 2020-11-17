@@ -8,18 +8,21 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    Error, FnArg, Ident, ItemTrait, Lit, MetaNameValue, ReturnType,
-    Signature, TraitItem, TraitItemMethod,
+    Error, FnArg, Ident, ItemTrait, Lit, MetaNameValue, ReturnType, Signature, TraitItem,
+    TraitItemMethod,
 };
 
 // --
 
-const PROSY_STR: &str = "proxy";
+const PROXY_STR: &str = "proxy";
 const SERVANT_STR: &str = "servant";
 const PERSISTENCY_STR: &str = "persistency";
 const CALLBACK_STR: &str = "callback";
 const RECEIVER_STR: &str = "receiver";
 const NOTIFIER_STR: &str = "notifier";
+
+const VALUE_EXPECT_STR: &str = "value expected '&\'static str' only.";
+const VALUE_EXPECT_BOOL: &str = "value expected 'bool' only.";
 
 // --
 
@@ -47,42 +50,45 @@ impl Parse for InvokeInterfaceAttributes {
             ..
         } in args.iter()
         {
-            match lit {
-                Lit::Str(lit_str) => {
+            let err_str = Error::new(lit.span(), VALUE_EXPECT_STR);
+            let err_bool = Error::new(lit.span(), VALUE_EXPECT_BOOL);
+
+            if path.is_ident(PROXY_STR) {
+                if let Lit::Str(lit_str) = lit {
                     let v = lit_str.value();
-                    if path.is_ident(PROSY_STR) {
-                        r.proxy.replace(v);
-                    } else if path.is_ident(SERVANT_STR) {
-                        r.servant.replace(v);
-                    } else {
-                        return Err(Error::new(
-                            lit_str.span(),
-                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
-                        ));
-                    }
+                    r.proxy.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
-                Lit::Bool(lit_bool) => {
+            } else if path.is_ident(SERVANT_STR) {
+                if let Lit::Str(lit_str) = lit {
+                    let v = lit_str.value();
+                    r.servant.replace(v);
+                } else {
+                    Err(err_str)?;
+                }
+            } else if path.is_ident(CALLBACK_STR) {
+                if let Lit::Bool(lit_bool) = lit {
                     let v = lit_bool.value;
-                    if path.is_ident(PERSISTENCY_STR) {
-                        r.persistency.replace(v);
-                    } else if path.is_ident(CALLBACK_STR) {
-                        r.callback.replace(v);
-                    } else {
-                        return Err(Error::new(
-                            lit_bool.span(),
-                            format!(
-                                "name expected '{}' or '{}' only.",
-                                PERSISTENCY_STR, CALLBACK_STR
-                            ),
-                        ));
-                    }
+                    r.callback.replace(v);
+                } else {
+                    Err(err_bool)?;
                 }
-                _ => {
-                    return Err(Error::new(
-                        lit.span(),
-                        "value expected '&str' or 'bool' only.",
-                    ));
+            } else if path.is_ident(PERSISTENCY_STR) {
+                if let Lit::Bool(lit_bool) = lit {
+                    let v = lit_bool.value;
+                    r.persistency.replace(v);
+                } else {
+                    Err(err_bool)?;
                 }
+            } else {
+                Err(Error::new(
+                    path.span(),
+                    format!(
+                        "name expected '{}', '{}', '{}' or '{}' only.",
+                        PROXY_STR, SERVANT_STR, PERSISTENCY_STR, CALLBACK_STR
+                    ),
+                ))?;
             }
         }
         Ok(r)
@@ -111,23 +117,27 @@ impl Parse for WatchInterfaceAttributes {
             ..
         } in args.iter()
         {
-            match lit {
-                Lit::Str(lit_str) => {
+            let err_str = Error::new(lit.span(), VALUE_EXPECT_STR);
+
+            if path.is_ident(PROXY_STR) {
+                if let Lit::Str(lit_str) = lit {
                     let v = lit_str.value();
-                    if path.is_ident(PROSY_STR) {
-                        r.proxy.replace(v);
-                    } else if path.is_ident(SERVANT_STR) {
-                        r.servant.replace(v);
-                    } else {
-                        return Err(Error::new(
-                            lit_str.span(),
-                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
-                        ));
-                    }
+                    r.proxy.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
-                _ => {
-                    return Err(Error::new(lit.span(), "value expected '&str' only."));
+            } else if path.is_ident(SERVANT_STR) {
+                if let Lit::Str(lit_str) = lit {
+                    let v = lit_str.value();
+                    r.servant.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
+            } else {
+                Err(Error::new(
+                    path.span(),
+                    format!("name expected '{}' or '{}' only.", PROXY_STR, SERVANT_STR),
+                ))?;
             }
         }
         Ok(r)
@@ -156,26 +166,27 @@ impl Parse for ReportInterfaceAttributes {
             ..
         } in args.iter()
         {
-            match lit {
-                Lit::Str(lit_str) => {
+            let err_str = Error::new(lit.span(), VALUE_EXPECT_STR);
+
+            if path.is_ident(PROXY_STR) {
+                if let Lit::Str(lit_str) = lit {
                     let v = lit_str.value();
-                    if path.is_ident(PROSY_STR) {
-                        r.proxy.replace(v);
-                    } else if path.is_ident(SERVANT_STR) {
-                        r.servant.replace(v);
-                    } else {
-                        return Err(Error::new(
-                            lit_str.span(),
-                            format!("name expected '{}' or '{}' only.", PROSY_STR, SERVANT_STR),
-                        ));
-                    }
+                    r.proxy.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
-                _ => {
-                    return Err(Error::new(
-                        lit.span(),
-                        "value expected '&str' only.",
-                    ));
+            } else if path.is_ident(SERVANT_STR) {
+                if let Lit::Str(lit_str) = lit {
+                    let v = lit_str.value();
+                    r.servant.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
+            } else {
+                Err(Error::new(
+                    path.span(),
+                    format!("name expected '{}' or '{}' only.", PROXY_STR, SERVANT_STR),
+                ))?;
             }
         }
         Ok(r)
@@ -183,7 +194,6 @@ impl Parse for ReportInterfaceAttributes {
 }
 
 // --
-
 
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct NotifyInterfaceAttributes {
@@ -205,26 +215,30 @@ impl Parse for NotifyInterfaceAttributes {
             ..
         } in args.iter()
         {
-            match lit {
-                Lit::Str(lit_str) => {
+            let err_str = Error::new(lit.span(), "value expected '&\'static str' only.");
+
+            if path.is_ident(NOTIFIER_STR) {
+                if let Lit::Str(lit_str) = lit {
                     let v = lit_str.value();
-                    if path.is_ident(RECEIVER_STR) {
-                        r.receiver.replace(v);
-                    } else if path.is_ident(NOTIFIER_STR) {
-                        r.notifier.replace(v);
-                    } else {
-                        return Err(Error::new(
-                            lit_str.span(),
-                            format!("name expected '{}' or '{}' only.", RECEIVER_STR, NOTIFIER_STR),
-                        ));
-                    }
+                    r.notifier.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
-                _ => {
-                    return Err(Error::new(
-                        lit.span(),
-                        "value expected '&str' only.",
-                    ));
+            } else if path.is_ident(RECEIVER_STR) {
+                if let Lit::Str(lit_str) = lit {
+                    let v = lit_str.value();
+                    r.receiver.replace(v);
+                } else {
+                    Err(err_str)?;
                 }
+            } else {
+                Err(Error::new(
+                    path.span(),
+                    format!(
+                        "name expected '{}' or '{}' only.",
+                        NOTIFIER_STR, RECEIVER_STR
+                    ),
+                ))?;
             }
         }
         Ok(r)
@@ -271,24 +285,24 @@ impl Parse for TraitContext {
             .map(|x| {
                 let TraitItemMethod {
                     attrs,
-                    sig,
+                    sig:
+                        Signature {
+                            constness,
+                            asyncness,
+                            unsafety,
+                            abi,
+                            fn_token,
+                            ident,
+                            generics,
+                            // paren_token,
+                            inputs,
+                            variadic,
+                            output,
+                            ..
+                        },
                     default,
                     semi_token,
                 } = x;
-                let Signature {
-                    constness,
-                    asyncness,
-                    unsafety,
-                    abi,
-                    fn_token,
-                    ident,
-                    generics,
-                    // paren_token,
-                    inputs,
-                    variadic,
-                    output,
-                    ..
-                } = sig;
                 let fn_ident = ident;
 
                 let output_type = match output.clone() {
@@ -395,20 +409,21 @@ impl TraitContext {
         attributes: &InvokeInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait: ItemTrait {
-                attrs,
-                vis,
-                unsafety,
-                auto_token,
-                trait_token,
-                ident,
-                generics,
-                colon_token,
-                supertraits,
-                // brace_token,
-                // items,
-                ..
-            },
+            item_trait:
+                ItemTrait {
+                    attrs,
+                    vis,
+                    unsafety,
+                    auto_token,
+                    trait_token,
+                    ident,
+                    generics,
+                    colon_token,
+                    supertraits,
+                    // brace_token,
+                    // items,
+                    ..
+                },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -598,20 +613,21 @@ impl TraitContext {
         attributes: &WatchInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait: ItemTrait {
-                attrs,
-                vis,
-                unsafety,
-                auto_token,
-                trait_token,
-                ident,
-                generics,
-                colon_token,
-                supertraits,
-                // brace_token,
-                // items,
-                ..
-            },
+            item_trait:
+                ItemTrait {
+                    attrs,
+                    vis,
+                    unsafety,
+                    auto_token,
+                    trait_token,
+                    ident,
+                    generics,
+                    colon_token,
+                    supertraits,
+                    // brace_token,
+                    // items,
+                    ..
+                },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -730,20 +746,21 @@ impl TraitContext {
         attributes: &ReportInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait: ItemTrait {
-                attrs,
-                vis,
-                unsafety,
-                auto_token,
-                trait_token,
-                ident,
-                generics,
-                colon_token,
-                supertraits,
-                // brace_token,
-                // items,
-                ..
-            },
+            item_trait:
+                ItemTrait {
+                    attrs,
+                    vis,
+                    unsafety,
+                    auto_token,
+                    trait_token,
+                    ident,
+                    generics,
+                    colon_token,
+                    supertraits,
+                    // brace_token,
+                    // items,
+                    ..
+                },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -760,12 +777,12 @@ impl TraitContext {
         let servant_ident = if let Some(ref s) = attributes.servant {
             Ident::new(&s, trait_ident.span())
         } else {
-            format_ident!("{}ReportServant", trait_ident)
+            format_ident!("{}Officer", trait_ident)
         };
         let proxy_ident = if let Some(ref p) = attributes.proxy {
             Ident::new(&p, trait_ident.span())
         } else {
-            format_ident!("{}ReportProxy", trait_ident)
+            format_ident!("{}Staff", trait_ident)
         };
 
         let output1 = if cfg!(any(feature = "server", feature = "client")) {
@@ -865,20 +882,21 @@ impl TraitContext {
         attributes: &NotifyInterfaceAttributes,
     ) -> TokenStream {
         let TraitContext {
-            item_trait: ItemTrait {
-                attrs,
-                vis,
-                unsafety,
-                auto_token,
-                trait_token,
-                ident,
-                generics,
-                colon_token,
-                supertraits,
-                // brace_token,
-                // items,
-                ..
-            },
+            item_trait:
+                ItemTrait {
+                    attrs,
+                    vis,
+                    unsafety,
+                    auto_token,
+                    trait_token,
+                    ident,
+                    generics,
+                    colon_token,
+                    supertraits,
+                    // brace_token,
+                    // items,
+                    ..
+                },
             fn_ident_vec,
             fn_ident_camel_vec,
             args_vec,
@@ -983,7 +1001,7 @@ impl TraitContext {
 }
 
 // --
-
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1014,3 +1032,4 @@ mod tests {
         // dbg!(&o);
     }
 }
+*/

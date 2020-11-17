@@ -193,7 +193,7 @@ impl HelloProxy {
             .await;
         response.map(|x| bincode::deserialize(&x).unwrap())
     }
-    fn bye(&mut self) -> ServantResult<()> {
+    pub fn bye(&mut self) -> ServantResult<()> {
         let request = HelloRequest::Bye { };
         let response = self
             .2
@@ -215,7 +215,7 @@ impl HelloProxy {
                 })
             .await
     }
-    fn bye_with_callback(&self, __f_20101008__: F) -> servant::ServantResult<()>
+    pub     fn bye_with_callback(&self, __f_20101008__: F) -> servant::ServantResult<()>
         where F: 'static + Fn(servant::ServantResult<()>) + Send,
     {
         let request = HelloRequest::Bye { };

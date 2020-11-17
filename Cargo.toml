@@ -25,4 +25,13 @@ proc-macro2 = "^1.0.6"
 
 [dev-dependencies]
 test-case = "^1.0.0-alpha-1"
+trybuild = "^1.0.23"
+serde = { version = "^1.0", features = ["derive"] }
+bincode = { version = "^1.2.1" }
+servant = {path = "../servant", features = ["full"] }
 
+# [dependencies.async-std]
+# version = "^1.7"
+# features = ["attributes"]
+
+# [[tests]]
